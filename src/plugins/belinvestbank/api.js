@@ -10,13 +10,15 @@ const base64 = new Base64()
 const loginUrl = 'https://login.belinvestbank.by/app_api'
 const dataUrl = 'https://ibank.belinvestbank.by/app_api'
 
-const APP_VERSION = '2.24.0'
+const APP_VERSION = '2.25.0'
 
 export function getDevice () {
   const deviceID = ZenMoney.getData('deviceId', generateRandomString(16))
   ZenMoney.setData('deviceId', deviceID)
   const deviceToken = ZenMoney.getData('token', base64.encode(generateRandomString(203)))
   ZenMoney.setData('token', deviceToken)
+  // Persist immediately so deviceId survives failed scrapes (never changes between runs)
+  ZenMoney.saveData()
   return {
     id: deviceID,
     token: deviceToken
@@ -76,45 +78,98 @@ export async function login (login, password) {
   if (ZenMoney.trustCertificates) {
     ZenMoney.trustCertificates([
       `-----BEGIN CERTIFICATE-----
-MIIGUzCCBTugAwIBAgIMTGWX/YRoKcy161yWMA0GCSqGSIb3DQEBCwUAMEwxCzAJ
-BgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMSIwIAYDVQQDExlB
-bHBoYVNTTCBDQSAtIFNIQTI1NiAtIEc0MB4XDTIzMDQyNjEyNTYxMloXDTI0MDUy
-NzEyNTYxMVowHTEbMBkGA1UEAwwSKi5iZWxpbnZlc3RiYW5rLmJ5MIIBIjANBgkq
-hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwyGdRWFd5xeApdnnvHD/jzfCFg0xoHPQ
-jJDQQVrbtvf1QWnl5ZS1aNmMxWHWfUzseJBMVLgpjtHxi5+SGX9M9H/8jbG2rZzU
-Xoy7uae7W+9o9q+gbluY5oMOt0swbH+/bZ/Jatxy6AFWPZzSIIDz6SBGWnzJkh+d
-k0JEIx6trQTdxLZPtOCy173Tqld6gW/iauIfbFbGWO+B/7Pb32kydCwa2xDttDf8
-a/HukSJMSvnBxKdPGHSNgzU/jCfVWtlL8eOpAGfDGYjVTzAMKZ6KToaWwmvlalQ6
-SC06i63dEq0yyc2zHSS7RGY6Sy4L6DA7AULzMYbw/HK+Jd4TAN+o8QIDAQABo4ID
-YjCCA14wDgYDVR0PAQH/BAQDAgWgMIGTBggrBgEFBQcBAQSBhjCBgzBGBggrBgEF
-BQcwAoY6aHR0cDovL3NlY3VyZS5nbG9iYWxzaWduLmNvbS9jYWNlcnQvYWxwaGFz
-c2xjYXNoYTI1Nmc0LmNydDA5BggrBgEFBQcwAYYtaHR0cDovL29jc3AuZ2xvYmFs
-c2lnbi5jb20vYWxwaGFzc2xjYXNoYTI1Nmc0MFcGA1UdIARQME4wCAYGZ4EMAQIB
-MEIGCisGAQQBoDIKAQMwNDAyBggrBgEFBQcCARYmaHR0cHM6Ly93d3cuZ2xvYmFs
-c2lnbi5jb20vcmVwb3NpdG9yeS8wCQYDVR0TBAIwADBBBgNVHR8EOjA4MDagNKAy
-hjBodHRwOi8vY3JsLmdsb2JhbHNpZ24uY29tL2FscGhhc3NsY2FzaGEyNTZnNC5j
-cmwwLwYDVR0RBCgwJoISKi5iZWxpbnZlc3RiYW5rLmJ5ghBiZWxpbnZlc3RiYW5r
-LmJ5MB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAfBgNVHSMEGDAWgBRP
-y6yowu+r3YNva7/OmD1cWCV2FTAdBgNVHQ4EFgQUyuef7y3E7vbbty/xDEweQXHb
-1DQwggF9BgorBgEEAdZ5AgQCBIIBbQSCAWkBZwB2AO7N0GTV2xrOxVy3nbTNE6Iy
-h0Z8vOzew1FIWUZxH7WbAAABh72i3ssAAAQDAEcwRQIhAK+urBOo3Cjk7bXaAEX7
-n0LWNkEBUrw2ue1TqN6ipZvFAiB3V49/RH6IbRARfw9NQPqfJQRtJnvkTWN31i22
-06j5qgB2AEiw42vapkc0D+VqAvqdMOscUgHLVt0sgdm7v6s52IRzAAABh72i3toA
-AAQDAEcwRQIgcranm84nePyV4/mgCaseOovjKlulymZtQiNpGtQ/uccCIQCg3uIU
-+HdNmH3qxCFFdbe5mZhh6/O5A2DE5fQyIO+EeAB1ANq2v2s/tbYin5vCu1xr6HCR
-cWy7UYSFNL2kPTBI1/urAAABh72i3wYAAAQDAEYwRAIgDQ7prrMlrHP1qjUfjPKo
-ug1w7k+cwx2qP0CopSjKavACIHM44RlC5Ws+NUjwQKL9YfdAi2fOqIF8tg6pMoth
-AXJmMA0GCSqGSIb3DQEBCwUAA4IBAQBMC+ujGTyasVS/xIDiCzHh18joFVXWeW2x
-oz39/RPrCNStjBLA7HxavytnQmxbT80ezbobzy1ow2Hq5FiVMubmpWiZhhXI+Mx+
-BvQ9erhe96jQG6UWriHYUEbtwy/M3GJYm1gWY1g0Ztci/YAVxkbPRAtdKkzWgij9
-QMfKNrv4JrCCi2DuQs21bKSsYgchAHNxxK68z+itGSEZa7GSd9oG74Cdwvn/Q2YS
-8t1ezDjQwK8w3i/JOiEXqUtt6SdfZm6/uQ2GSHfn0jtVxtjUsYp7xedvprT3ctnL
-6fBvjH54zyqtVIgeyrG3A85Qh5UyxuSvYntxZ2I3k3kIGU63CVr7
+MIIJOTCCCCGgAwIBAgIMSqLONbKaZMW658uzMA0GCSqGSIb3DQEBCwUAMGIxCzAJ
+BgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMTgwNgYDVQQDEy9H
+bG9iYWxTaWduIEV4dGVuZGVkIFZhbGlkYXRpb24gQ0EgLSBTSEEyNTYgLSBHMzAe
+Fw0yNTA0MDExMzU2MTRaFw0yNjA1MDMxMzU2MTNaMIIBFTEdMBsGA1UEDwwUUHJp
+dmF0ZSBPcmdhbml6YXRpb24xEjAQBgNVBAUTCTgwNzAwMDAyODETMBEGCysGAQQB
+gjc8AgEDEwJCWTELMAkGA1UEBhMCQlkxEzARBgNVBAgMCtCc0LjQvdGB0LoxEzAR
+BgNVBAcMCtCc0LjQvdGB0LoxeTB3BgNVBAoMcNCe0JDQniDQkdC10LvQvtGA0YPR
+gdGB0LrQuNC5INCx0LDQvdC6INGA0LDQt9Cy0LjRgtC40Y8g0Lgg0YDQtdC60L7Q
+vdGB0YLRgNGD0LrRhtC40Lgg0JHQtdC70LjQvdCy0LXRgdGC0LHQsNC90LoxGTAX
+BgNVBAMTEGJlbGludmVzdGJhbmsuYnkwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
+ggEKAoIBAQDLufFqw1FAFl6i3OLxtrxIAwG9j5BF9sox625iSIpd0SysM+8gEqHX
+b3pP2LsMmypQOeS8G1VbkKLpMVSQWGlBWUCyiXcxQmgWKnEhdJu2/zwlMkDPcKIv
+6NPi0fZc6uA9GAa14RLntiQY/AyVrsFsP07NkabUxRcDYQFV8QZV2iF6+leT5/UK
+HHVNL8iltn22uib9nAUWg7qq7xMnGGxM9/YD5/dxFwBHtdW+71oaqERcLh+wiULn
+ot/LYM5QWGk+IiAjyYMmqmQFJ1H1fq38ZH+ucufyPL1V8PJtbyjt4bmtBCoxgyG0
+pyJKlY3DqecSFBeQGXAtnQTrn1vAeQAZAgMBAAGjggU4MIIFNDAOBgNVHQ8BAf8E
+BAMCBaAwDAYDVR0TAQH/BAIwADCBlgYIKwYBBQUHAQEEgYkwgYYwRwYIKwYBBQUH
+MAKGO2h0dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0L2dzZXh0ZW5k
+dmFsc2hhMmczcjMuY3J0MDsGCCsGAQUFBzABhi9odHRwOi8vb2NzcDIuZ2xvYmFs
+c2lnbi5jb20vZ3NleHRlbmR2YWxzaGEyZzNyMzBVBgNVHSAETjBMMEEGCSsGAQQB
+oDIBATA0MDIGCCsGAQUFBwIBFiZodHRwczovL3d3dy5nbG9iYWxzaWduLmNvbS9y
+ZXBvc2l0b3J5LzAHBgVngQwBATBFBgNVHR8EPjA8MDqgOKA2hjRodHRwOi8vY3Js
+Lmdsb2JhbHNpZ24uY29tL2dzL2dzZXh0ZW5kdmFsc2hhMmczcjMuY3JsMIIB+QYD
+VR0RBIIB8DCCAeyCEGJlbGludmVzdGJhbmsuYnmCHnhuLS04MGFiYWRvYnR1ZHZl
+OWJuLnhuLS05MGFpc4IgeG4tLTgwYWJhZG9iMWJkc2U1Ym05dy54bi0tOTBhaXOC
+FmliYW5rLmJlbGludmVzdGJhbmsuYnmCFHBvcy5iZWxpbnZlc3RiYW5rLmJ5ghRi
+aXouYmVsaW52ZXN0YmFuay5ieYIWbG9naW4uYmVsaW52ZXN0YmFuay5ieYIVbmNt
+cy5iZWxpbnZlc3RiYW5rLmJ5ghdjYW1wdXMuYmVsaW52ZXN0YmFuay5ieYIdd2Vi
+LXBhcnRuZXJzLmJlbGludmVzdGJhbmsuYnmCFm5jd2ViLmJlbGludmVzdGJhbmsu
+YnmCFHd3dy5iZWxpbnZlc3RiYW5rLmJ5ghdpYmtzZ24uYmVsaW52ZXN0YmFuay5i
+eYIUdGliLmJlbGludmVzdGJhbmsuYnmCGGFwaS1iaXouYmVsaW52ZXN0YmFuay5i
+eYIaYXBpLWliYW5rLmJlbGludmVzdGJhbmsuYnmCFHJjcC5iZWxpbnZlc3RiYW5r
+LmJ5ghVyY3AyLmJlbGludmVzdGJhbmsuYnmCFHJjcy5iZWxpbnZlc3RiYW5rLmJ5
+ghVyY3MyLmJlbGludmVzdGJhbmsuYnkwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsG
+AQUFBwMCMB8GA1UdIwQYMBaAFN2z522oLujFTm7PdOZ1PJQVzugdMB0GA1UdDgQW
+BBRmWcQ/cVoityc+wUcnRnG6MvmSbTCCAX8GCisGAQQB1nkCBAIEggFvBIIBawFp
+AHYAZBHEbKQS7KeJHKICLgC8q08oB9QeNSer6v7VA8l9zfAAAAGV8aOFnwAABAMA
+RzBFAiA3ZW0iMS3Rp0Sp1p0cpGYeAJtkpLLav5OMRIF4ceCJBQIhAOFiWG0/8av6
+cCj2LVy0E+F2Qap22SRxaUrfqcgXeumaAHcADleUvPOuqT4zGyyZB7P3kN+bwj1x
+MiXdIaklrGHFTiEAAAGV8aOFkgAABAMASDBGAiEAxjnAR5Ye2sjJ6HU++fIITiKG
+/AHZtdrjyoZcoBDWb/UCIQCahbvOBSOeSWL1ufoYd2Om4zhI22WO/B7ztM5XletJ
+HQB2ACUvlMIrKelun0EacgcraVxbUv+XqQ0lQLv83FHsTe4LAAABlfGjhesAAAQD
+AEcwRQIhAMvHswDtFbv9nLFPDew9HIiD0cF139Ufp2Iiis0A7URZAiATL2zWm6Sk
+biMchT5R/wnsKytq2Xraj4WJKskkbbQO6DANBgkqhkiG9w0BAQsFAAOCAQEAPtKU
+bJbyhPN2VSzCZsHYKOuyrNv1bu8frTtxABbfNurnQJEhnZQEfIe9WQ1ShX9z6AzM
+CSPub+NgdZ4m65qDovlx9ytW83+ULwtGHWkcmFzgnv1hYuNvbSWSvHbv5So1/+6I
+iTrKM/IuEcn+4m2ZxhnLxOKl/ofgw2LpV1T1s5oxClzW1uU35HvZLwInReYmP6yF
+rr9+sx5lWZ5CJPJgBmgN9M3I86qHJTZiO2skkWQVohpGyuBr17SUgDcmjGA+seMN
+RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
+9FjOp+7y/TY6Iv819Q==
 -----END CERTIFICATE-----`
     ])
   }
 
+  // Reuse saved session to avoid repeated device registration
+  const savedCookies = ZenMoney.getData('sessionCookies', null)
+  if (savedCookies) {
+    try {
+      const testRes = await fetchApiJson(dataUrl, {
+        method: 'POST',
+        headers: { Cookie: savedCookies },
+        body: { section: 'payments', method: 'index' }
+      }, response => response.success && response.body.status === 'OK',
+      () => { throw new Error('Session invalid') })
+      if (testRes.body.status === 'OK') {
+        return savedCookies
+      }
+    } catch (e) {
+      ZenMoney.setData('sessionCookies', null)
+    }
+  }
+
   const device = getDevice()
+
+  // Step 1: Get initial ibank session (needed for authCallback later)
+  const ibankInitRes = await fetchJson(dataUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Android',
+      Connection: 'Keep-Alive',
+      'Accept-Encoding': 'gzip'
+    },
+    body: { section: 'account', method: 'signin', login: '', password: '' },
+    sanitizeRequestLog: {},
+    sanitizeResponseLog: { headers: { 'set-cookie': true } },
+    stringify
+  })
+  let ibankCookies = cookies(ibankInitRes)
+  console.log('>>> [1] ibank init: got session', ibankCookies ? 'YES' : 'NO')
+
+  // Step 2: Authenticate on login server
   let res = (await fetchApiJson(loginUrl, {
     method: 'POST',
     body: {
@@ -126,26 +181,59 @@ QMfKNrv4JrCCi2DuQs21bKSsYgchAHNxxK68z+itGSEZa7GSd9oG74Cdwvn/Q2YS
       versionApp: APP_VERSION,
       os: 'Android',
       device_token: device.token,
-      device_token_type: 'ANDROID'
+      device_token_type: 'ANDROID',
+      isOauth: true
     },
     sanitizeRequestLog: { body: { login: true, password: true } }
   }, response => response.success, message => new InvalidPreferencesError('Неверный логин или пароль')))
-  let sessionCookies = cookies(res)
+  let loginCookies = cookies(res)
+  console.log('>>> [2] signin FULL BODY:', JSON.stringify(res.body))
 
   if (res.body.isNeedConfirmSessionKey) {
-    res = (await fetchApiJson(loginUrl, {
+    console.log('>>> [2b] Closing existing session...')
+    await fetchApiJson(loginUrl, {
       method: 'POST',
+      headers: { Cookie: loginCookies },
       body: {
         section: 'account',
         method: 'confirmationCloseSession'
       }
+    }, response => response.success, message => new InvalidPreferencesError('bad request'))
+
+    // After closing the old session, re-signin to get a clean auth with authCode
+    console.log('>>> [2c] Re-signin after closing session...')
+    res = (await fetchApiJson(loginUrl, {
+      method: 'POST',
+      body: {
+        section: 'account',
+        method: 'signin',
+        login,
+        password,
+        deviceId: device.id,
+        versionApp: APP_VERSION,
+        os: 'Android',
+        device_token: device.token,
+        device_token_type: 'ANDROID',
+        isOauth: true
+      },
+      sanitizeRequestLog: { body: { login: true, password: true } }
     }, response => response.success, message => new InvalidPreferencesError('bad request')))
+    loginCookies = cookies(res)
+    console.log('>>> [2c] re-signin FULL BODY:', JSON.stringify(res.body))
   }
 
+  // Detect new bank flow (2025+): bank authenticates directly and returns full user profile
+  // without requiring OTP. Can happen from signin OR from confirmationCloseSession.
+  const isDirectAuth = res.body.status === 'OK' && Boolean(res.body.values && res.body.values.login)
+
   let isNeededSaveDevice = false
-  if (res.body.values && !res.body.values.authCode) {
-    // Значит нужно подтверджать смс
-    const code = await ZenMoney.readLine('Введите код из СМС', {
+  if (isDirectAuth) {
+    // Already authenticated — bank returned user profile. No OTP needed.
+    console.log('>>> Direct auth detected (no OTP needed)')
+    isNeededSaveDevice = true
+  } else if (res.body.values && !res.body.values.authCode) {
+    // OLD FLOW: need SMS OTP verification
+    const code = await ZenMoney.readLine('Введите ПОСЛЕДНИЙ код из СМС', {
       time: 120000,
       inputType: 'number'
     })
@@ -155,7 +243,7 @@ QMfKNrv4JrCCi2DuQs21bKSsYgchAHNxxK68z+itGSEZa7GSd9oG74Cdwvn/Q2YS
 
     res = (await fetchApiJson(loginUrl, {
       method: 'POST',
-      headers: { Cookie: sessionCookies },
+      headers: { Cookie: loginCookies },
       body: {
         section: 'account',
         method: 'signin2',
@@ -169,15 +257,42 @@ QMfKNrv4JrCCi2DuQs21bKSsYgchAHNxxK68z+itGSEZa7GSd9oG74Cdwvn/Q2YS
     isNeededSaveDevice = true
   }
 
-  res = (await fetchApiJson(dataUrl, {
-    method: 'POST',
-    body: {
-      section: 'account',
-      method: 'authCallback',
-      auth_code: res.body.values.authCode
-    }
-  }, response => response.success && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request')))
-  sessionCookies = cookies(res)
+  let sessionCookies
+  if (res.body.values && res.body.values.authCode) {
+    // Have authCode (OTP flow or re-signin with session conflict): use authCallback on ibank
+    console.log('>>> [4] authCallback with auth_code on ibank')
+    const authCallbackRes = (await fetchApiJson(dataUrl, {
+      method: 'POST',
+      headers: { Cookie: ibankCookies },
+      body: {
+        section: 'account',
+        method: 'authCallback',
+        auth_code: res.body.values.authCode
+      }
+    }, response => response.success && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request')))
+    sessionCookies = cookies(authCallbackRes) || ibankCookies
+  } else {
+    // Direct auth without authCode: signin directly on ibank with credentials.
+    // The bank recognizes the registered device and authenticates the ibank session.
+    console.log('>>> [4] No authCode, signing in directly on ibank...')
+    const ibankSigninRes = (await fetchApiJson(dataUrl, {
+      method: 'POST',
+      body: {
+        section: 'account',
+        method: 'signin',
+        login,
+        password,
+        deviceId: device.id,
+        versionApp: APP_VERSION,
+        os: 'Android',
+        device_token: device.token,
+        device_token_type: 'ANDROID'
+      },
+      sanitizeRequestLog: { body: { login: true, password: true } }
+    }, response => response.success && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request')))
+    sessionCookies = cookies(ibankSigninRes) || ibankCookies
+    console.log('>>> [4] ibank signin OK, sessionCookies:', sessionCookies)
+  }
 
   if (isNeededSaveDevice) {
     await fetchApiJson(dataUrl, {
@@ -192,6 +307,8 @@ QMfKNrv4JrCCi2DuQs21bKSsYgchAHNxxK68z+itGSEZa7GSd9oG74Cdwvn/Q2YS
     }, response => response.success && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request'))
   }
 
+  ZenMoney.setData('sessionCookies', sessionCookies)
+  ZenMoney.saveData()
   return sessionCookies
 }
 

@@ -7,9 +7,9 @@ import { makePluginDataApi } from '../../../ZPAPI.pluginData'
 describe('scrape', () => {
   it('should hit the mocks and return results', async () => {
     mockZenMoney()
-    mockApiLoginAndPass()
+    mockApiIbankInit()
+    mockApiSignin()
     mockApiCloseLastSession()
-    mockApiSmsCode()
     mockApiAuthCallback()
     mockApiSaveDevice()
     mockApiFetchAccounts()
@@ -55,10 +55,30 @@ describe('scrape', () => {
   })
 })
 
+function mockApiIbankInit () {
+  fetchMock.once({
+    method: 'POST',
+    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && body === stringify({
+      section: 'account',
+      method: 'signin',
+      login: '',
+      password: ''
+    }),
+    response: {
+      status: 200,
+      headers: { 'set-cookie': 'PHPSESSID=ibanksession;' },
+      body: {
+        status: 'OK',
+        values: { isSignInPage: true }
+      }
+    }
+  })
+}
+
 function mockApiFetchTransactions () {
   fetchMock.once({
     method: 'POST',
-    headers: { Cookie: '' },
+    headers: { Cookie: 'PHPSESSID=ibanksession;' },
     matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && _.isEqual(body, stringify({
       section: 'cards',
       method: 'history',
@@ -165,7 +185,7 @@ function mockApiFetchTransactions () {
 function mockApiFetchAccounts () {
   fetchMock.once({
     method: 'POST',
-    headers: { Cookie: '' },
+    headers: { Cookie: 'PHPSESSID=ibanksession;' },
     matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && _.isEqual(body, stringify({
       section: 'payments',
       method: 'index'
@@ -250,7 +270,7 @@ function mockApiFetchAccounts () {
 function mockApiSaveDevice () {
   fetchMock.once({
     method: 'POST',
-    headers: { Cookie: '' },
+    headers: { Cookie: 'PHPSESSID=ibanksession;' },
     matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && _.isEqual(body, stringify({
       section: 'mobile',
       method: 'setDeviceId',
@@ -283,6 +303,47 @@ function mockApiSaveDevice () {
       }
     }
   })
+}
+
+function mockApiSignin () {
+  let callCount = 0
+  const signinMatcher = (url, { body }) => url === 'https://login.belinvestbank.by/app_api' && _.isEqual(body, stringify({
+    section: 'account',
+    method: 'signin',
+    login: '123456789',
+    password: 'pass',
+    deviceId: 'device id',
+    versionApp: '2.25.0',
+    os: 'Android',
+    device_token: 'device token',
+    device_token_type: 'ANDROID'
+  }))
+  fetchMock.mock(signinMatcher, () => {
+    callCount++
+    if (callCount === 1) {
+      return {
+        status: 200,
+        body: JSON.stringify({
+          isNeedConfirmSessionKey: '1',
+          message: 'Внимание! Система "Интернет-банкинг" уже запущена, повторный запуск запрещен.',
+          status: 'ER',
+          textMessage: 'Внимание! Система "Мобильный банкинг" уже запущена, повторный запуск запрещен. Вы хотите аннулировать предыдущий запуск системы?'
+        })
+      }
+    }
+    return {
+      status: 200,
+      body: JSON.stringify({
+        status: 'OK',
+        values: {
+          login: 'Kabaye',
+          clientName: 'Vasiliy',
+          authCode: 'auth code',
+          _appName: 'simple'
+        }
+      })
+    }
+  }, { method: 'POST' })
 }
 
 function mockApiAuthCallback () {
@@ -375,32 +436,6 @@ function mockApiCloseLastSession () {
           userImage: 'user_3',
           _appName: 'simple'
         }
-      }
-    }
-  })
-}
-
-function mockApiLoginAndPass () {
-  fetchMock.once({
-    method: 'POST',
-    matcher: (url, { body }) => url === 'https://login.belinvestbank.by/app_api' && _.isEqual(body, stringify({
-      section: 'account',
-      method: 'signin',
-      login: '123456789',
-      password: 'pass',
-      deviceId: 'device id',
-      versionApp: '2.24.0',
-      os: 'Android',
-      device_token: 'device token',
-      device_token_type: 'ANDROID'
-    })),
-    response: {
-      status: 200,
-      body: {
-        isNeedConfirmSessionKey: '1',
-        message: 'Внимание! Система "Интернет-банкинг" уже запущена, повторный запуск запрещен.',
-        status: 'ER',
-        textMessage: 'Внимание! Система "Мобильный банкинг" уже запущена, повторный запуск запрещен. Вы хотите аннулировать предыдущий запуск системы?'
       }
     }
   })

@@ -150,14 +150,14 @@ function generatePluginConfig (production, server, pluginName, outputPath) {
         devMiddleware: {
           publicPath: '/'
         },
-        host: 'localhost',
+        host: '0.0.0.0',
         ...production && {
           host: 'local-ip',
           client: false,
           hot: false,
           liveReload: false
         },
-        port: 'auto',
+        port: 18080,
         webSocketServer: WebsocketServer,
 
         setupMiddlewares (middlewares, devServer) {
