@@ -11,6 +11,14 @@ var jsData = {"alphabet":{"lang":["a","b","c","d","e","f","g","h","i","j","k","l
 </body></html>`
 
 describe('scrape', () => {
+  beforeEach(() => {
+    // Fix Date.now so the 120-day cap is deterministic
+    jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-04-02T00:00:00.000Z').getTime())
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
   it('should hit the mocks and return results', async () => {
     mockZenMoney()
     mockWebSigninPage()
@@ -24,8 +32,8 @@ describe('scrape', () => {
     const result = await scrape(
       {
         preferences: { login: '123456789', password: 'pass' },
-        fromDate: new Date(2018, 11, 27),
-        toDate: new Date(2019, 0, 2)
+        fromDate: new Date(2025, 11, 27),
+        toDate: new Date(2026, 0, 2)
       }
     )
 
@@ -44,7 +52,7 @@ describe('scrape', () => {
     expect(result.transactions).toEqual([
       {
         hold: false,
-        date: new Date('2019-01-01T10:12:13+03:00'),
+        date: new Date('2026-01-01T10:12:13+03:00'),
         movements: [
           {
             id: null,
@@ -235,8 +243,8 @@ function mockApiFetchTransactions () {
       section: 'cards',
       method: 'history',
       cardId: 30848200,
-      dateFrom: '27.12.2018',
-      dateTo: '02.01.2019'
+      dateFrom: '27.12.2025',
+      dateTo: '02.01.2026'
     })),
     response: {
       status: 200,
@@ -293,7 +301,7 @@ function mockApiFetchTransactions () {
           history: [
             {
               cardNum: '**** **** **** 1111',
-              date: '2019-01-01 10:12:13',
+              date: '2026-01-01 10:12:13',
               type: 'ПОПОЛНЕНИЕ',
               accountAmt: '10,13',
               status: 'ПРОВЕДЕНО'
@@ -309,8 +317,8 @@ function mockApiFetchTransactions () {
             currency: 'BYN',
             type: 'БЕЛКАРТ-Maestro'
           },
-          dateFrom: '27.12.2018',
-          dateTo: '02.01.2019',
+          dateFrom: '27.12.2025',
+          dateTo: '02.01.2026',
           emailSubscribed: false,
           enableCorp: '1',
           enableSimple: '1',

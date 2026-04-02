@@ -2,12 +2,16 @@ import { fetchAccounts, fetchTransactions, login } from './api'
 import { convertAccount, convertTransaction } from './converters'
 
 export async function scrape ({ preferences, fromDate, toDate }) {
+  // Cap lookback to 120 days to avoid hammering the API with years of history
+  const maxLookback = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000)
+  if (fromDate < maxLookback) fromDate = maxLookback
+
   const token = await login(preferences.login, preferences.password)
   const accounts = (await fetchAccounts(token))
     .map(convertAccount)
 
   const transactions = []
-  await Promise.all(accounts.map(async account => {
+  for (const account of accounts) {
     const apiTransactions = await fetchTransactions(token, account, fromDate, toDate)
     for (const apiTransaction of apiTransactions) {
       const transaction = convertTransaction(apiTransaction, account)
@@ -15,7 +19,7 @@ export async function scrape ({ preferences, fromDate, toDate }) {
         transactions.push(transaction)
       }
     }
-  }))
+  }
   return {
     accounts,
     transactions
