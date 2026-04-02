@@ -1,17 +1,34 @@
+function parseAmount (str) {
+  if (!str && str !== 0) return null
+  const s = String(str).replace(/\s/g, '')
+  if (s === '') return null
+  const n = Number.parseFloat(s)
+  return isNaN(n) ? null : n
+}
+
 export function convertAccount (json) {
-  const freeAmt = json.freeAmt.replace(/\s/g, '') !== '' ? Number.parseFloat(json.freeAmt.replace(/\s/g, '')) : 0
-  const availableAmt = json.availableAmt.replace(/\s/g, '') !== '' && json.availableAmt !== null ? Number.parseFloat(json.availableAmt.replace(/\s/g, '')) : 0
-  let balance = freeAmt || Number.parseFloat(json.balance.replace(/\s/g, ''))
-  if (json.isOverdraft) {
-    balance = Number.parseFloat(json.availableAmt !== null ? json.availableAmt.replace(/\s/g, '') : 0) - Number.parseFloat(json.overdraftAmt.replace(/\s/g, ''))
+  const freeAmt = parseAmount(json.freeAmt) ?? 0
+  const availableAmt = parseAmount(json.availableAmt) ?? 0
+  const overdraftAmt = parseAmount(json.overdraftAmt) ?? 0
+  const isCredit = json.isOverdraft || json.isCredit
+
+  let balance, creditLimit
+  if (isCredit) {
+    // Credit card: balance = available - limit (negative means debt)
+    balance = availableAmt - overdraftAmt
+    creditLimit = availableAmt
+  } else {
+    balance = freeAmt !== 0 ? freeAmt : (parseAmount(json.balance) ?? 0)
+    creditLimit = Math.max(0, availableAmt - freeAmt)
   }
+
   return {
     id: json.id,
     type: 'card',
     title: json.finalName + '*' + json.num.slice(-4),
     instrument: json.currency,
     balance: Math.round(balance * 100) / 100,
-    creditLimit: availableAmt - freeAmt,
+    creditLimit: Math.round(creditLimit * 100) / 100,
     syncID: [json.num.slice(-4)]
   }
 }

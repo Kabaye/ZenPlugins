@@ -164,7 +164,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
         method: 'POST',
         headers: { Cookie: savedCookies },
         body: { section: 'payments', method: 'index' }
-      }, response => response.success && response.body.status === 'OK',
+      }, response => response.ok && response.body?.status === 'OK',
       () => { throw new Error('Session invalid') })
       if (testRes.body.status === 'OK') {
         return savedCookies
