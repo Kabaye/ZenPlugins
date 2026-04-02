@@ -313,23 +313,22 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
   toDate = toDate || new Date()
 
   const dates = createDateIntervals(fromDate, toDate)
-  const responses = await Promise.all(dates.map(dates => fetchApiJson(dataUrl, {
-    method: 'POST',
-    headers: { Cookie: sessionCookies },
-    body: {
-      section: 'cards',
-      method: 'history',
-      cardId: account.id,
-      dateFrom: formatDate(dates[0]),
-      dateTo: formatDate(dates[1])
-    }
-  }, response => response.body && response.body.values && response.body.values.history && response.body.values.history.length > 0,
-  message => new InvalidPreferencesError('bad request'))
+  const responses = await Promise.all(dates.map(([dateFrom, dateTo]) =>
+    fetchApiJson(dataUrl, {
+      method: 'POST',
+      headers: { Cookie: sessionCookies },
+      body: {
+        section: 'cards',
+        method: 'history',
+        cardId: account.id,
+        dateFrom: formatDate(dateFrom),
+        dateTo: formatDate(dateTo)
+      }
+    }, () => true, () => null).catch(() => null)
   ))
 
-  const operations = flatMap(responses, response => {
-    return flatMap(response.body.values.history, op => op)
+  return flatMap(responses, response => {
+    const history = response && response.body && response.body.values && response.body.values.history
+    return history ? flatMap(history, op => op) : []
   })
-
-  return operations
 }
