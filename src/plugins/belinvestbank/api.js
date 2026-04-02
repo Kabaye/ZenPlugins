@@ -1,29 +1,9 @@
-import { Base64 } from 'jshashes'
 import { defaultsDeep, flatMap } from 'lodash'
 import { stringify } from 'querystring'
 import { createDateIntervals as commonCreateDateIntervals } from '../../common/dateUtils'
-import { fetchJson } from '../../common/network'
-import { generateRandomString } from '../../common/utils'
-import { InvalidOtpCodeError } from '../../errors'
+import { fetchJson, openWebViewAndInterceptRequest } from '../../common/network'
 
-const base64 = new Base64()
-const loginUrl = 'https://login.belinvestbank.by/app_api'
 const dataUrl = 'https://ibank.belinvestbank.by/app_api'
-
-const APP_VERSION = '2.25.0'
-
-export function getDevice () {
-  const deviceID = ZenMoney.getData('deviceId', generateRandomString(16))
-  ZenMoney.setData('deviceId', deviceID)
-  const deviceToken = ZenMoney.getData('token', base64.encode(generateRandomString(203)))
-  ZenMoney.setData('token', deviceToken)
-  // Persist immediately so deviceId survives failed scrapes (never changes between runs)
-  ZenMoney.saveData()
-  return {
-    id: deviceID,
-    token: deviceToken
-  }
-}
 
 async function fetchApiJson (url, options, predicate = () => true, error = (message) => console.assert(false, message)) {
   options = defaultsDeep(
@@ -41,6 +21,9 @@ async function fetchApiJson (url, options, predicate = () => true, error = (mess
       stringify
     }
   )
+  if (options.headers && options.headers.Cookie) {
+    options.headers['zp-cookie'] = options.headers.Cookie
+  }
 
   const response = await fetchJson(url, options)
   if (predicate) {
@@ -65,10 +48,10 @@ function validateResponse (response, predicate, error) {
 
 function cookies (response) {
   if (response.headers) {
-    const cookies = response.headers['set-cookie']
-    if (cookies) {
-      const requiredValues = /(PHPSESSID=[^;]*;)/g
-      return cookies.match(requiredValues)[cookies.match(requiredValues).length - 1]
+    const setCookie = response.headers['set-cookie']
+    if (setCookie) {
+      const matches = setCookie.match(/PHPSESSID=[^;,\s]+/g)
+      if (matches) return matches[matches.length - 1] + ';'
     }
   }
   return ''
@@ -132,7 +115,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
     ])
   }
 
-  // Reuse saved session to avoid repeated device registration
+  // Reuse saved session to avoid repeated authentication
   const savedCookies = ZenMoney.getData('sessionCookies', null)
   if (savedCookies) {
     try {
@@ -150,9 +133,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
     }
   }
 
-  const device = getDevice()
-
-  // Step 1: Get initial ibank session (needed for authCallback later)
+  // Get initial ibank session (required as base for authCallback)
   const ibankInitRes = await fetchJson(dataUrl, {
     method: 'POST',
     headers: {
@@ -166,154 +147,41 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
     sanitizeResponseLog: { headers: { 'set-cookie': true } },
     stringify
   })
-  let ibankCookies = cookies(ibankInitRes)
-  console.log('>>> [1] ibank init: got session', ibankCookies ? 'YES' : 'NO')
+  const ibankCookies = cookies(ibankInitRes)
 
-  // Step 2: Authenticate on login server
-  let res = (await fetchApiJson(loginUrl, {
+  // Authenticate via bank's web UI: user logs in and completes OTP in a WebView.
+  // We intercept the redirect to ibank/authCallback to capture the auth_code.
+  const authCode = await openWebViewAndInterceptRequest({
+    url: 'https://login.belinvestbank.by/signin',
+    sanitizeRequestLog: { url: false },
+    intercept: (request) => {
+      const url = new URL(request.url)
+      if (url.hostname === 'ibank.belinvestbank.by' && url.pathname === '/authCallback') {
+        const code = url.searchParams.get('auth_code')
+        if (code) return code
+      }
+      return null
+    }
+  })
+
+  const authCallbackRes = await fetchApiJson(dataUrl, {
     method: 'POST',
+    headers: { Cookie: ibankCookies },
     body: {
       section: 'account',
-      method: 'signin',
-      login,
-      password,
-      deviceId: device.id,
-      versionApp: APP_VERSION,
-      os: 'Android',
-      device_token: device.token,
-      device_token_type: 'ANDROID',
-      isOauth: true
-    },
-    sanitizeRequestLog: { body: { login: true, password: true } }
-  }, response => response.success, message => new InvalidPreferencesError('Неверный логин или пароль')))
-  let loginCookies = cookies(res)
-  console.log('>>> [2] signin FULL BODY:', JSON.stringify(res.body))
-
-  if (res.body.isNeedConfirmSessionKey) {
-    console.log('>>> [2b] Closing existing session...')
-    await fetchApiJson(loginUrl, {
-      method: 'POST',
-      headers: { Cookie: loginCookies },
-      body: {
-        section: 'account',
-        method: 'confirmationCloseSession'
-      }
-    }, response => response.success, message => new InvalidPreferencesError('bad request'))
-
-    // After closing the old session, re-signin to get a clean auth with authCode
-    console.log('>>> [2c] Re-signin after closing session...')
-    res = (await fetchApiJson(loginUrl, {
-      method: 'POST',
-      body: {
-        section: 'account',
-        method: 'signin',
-        login,
-        password,
-        deviceId: device.id,
-        versionApp: APP_VERSION,
-        os: 'Android',
-        device_token: device.token,
-        device_token_type: 'ANDROID',
-        isOauth: true
-      },
-      sanitizeRequestLog: { body: { login: true, password: true } }
-    }, response => response.success, message => new InvalidPreferencesError('bad request')))
-    loginCookies = cookies(res)
-    console.log('>>> [2c] re-signin FULL BODY:', JSON.stringify(res.body))
-  }
-
-  // Detect new bank flow (2025+): bank authenticates directly and returns full user profile
-  // without requiring OTP. Can happen from signin OR from confirmationCloseSession.
-  const isDirectAuth = res.body.status === 'OK' && Boolean(res.body.values && res.body.values.login)
-
-  let isNeededSaveDevice = false
-  if (isDirectAuth) {
-    // Already authenticated — bank returned user profile. No OTP needed.
-    console.log('>>> Direct auth detected (no OTP needed)')
-    isNeededSaveDevice = true
-  } else if (res.body.values && !res.body.values.authCode) {
-    // OLD FLOW: need SMS OTP verification
-    const code = await ZenMoney.readLine('Введите ПОСЛЕДНИЙ код из СМС', {
-      time: 120000,
-      inputType: 'number'
-    })
-    if (!code || !code.trim()) {
-      throw new InvalidOtpCodeError()
+      method: 'authCallback',
+      auth_code: authCode
     }
+  }, response => response.success && response.body.status === 'OK',
+  message => new InvalidPreferencesError('Ошибка авторизации'))
 
-    res = (await fetchApiJson(loginUrl, {
-      method: 'POST',
-      headers: { Cookie: loginCookies },
-      body: {
-        section: 'account',
-        method: 'signin2',
-        action: 1,
-        key: code,
-        device_token: device.token,
-        device_token_type: 'ANDROID'
-      }
-    }, response => response.success && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request')))
-
-    isNeededSaveDevice = true
-  }
-
-  let sessionCookies
-  if (res.body.values && res.body.values.authCode) {
-    // Have authCode (OTP flow or re-signin with session conflict): use authCallback on ibank
-    console.log('>>> [4] authCallback with auth_code on ibank')
-    const authCallbackRes = (await fetchApiJson(dataUrl, {
-      method: 'POST',
-      headers: { Cookie: ibankCookies },
-      body: {
-        section: 'account',
-        method: 'authCallback',
-        auth_code: res.body.values.authCode
-      }
-    }, response => response.success && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request')))
-    sessionCookies = cookies(authCallbackRes) || ibankCookies
-  } else {
-    // Direct auth without authCode: signin directly on ibank with credentials.
-    // The bank recognizes the registered device and authenticates the ibank session.
-    console.log('>>> [4] No authCode, signing in directly on ibank...')
-    const ibankSigninRes = (await fetchApiJson(dataUrl, {
-      method: 'POST',
-      body: {
-        section: 'account',
-        method: 'signin',
-        login,
-        password,
-        deviceId: device.id,
-        versionApp: APP_VERSION,
-        os: 'Android',
-        device_token: device.token,
-        device_token_type: 'ANDROID'
-      },
-      sanitizeRequestLog: { body: { login: true, password: true } }
-    }, response => response.success && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request')))
-    sessionCookies = cookies(ibankSigninRes) || ibankCookies
-    console.log('>>> [4] ibank signin OK, sessionCookies:', sessionCookies)
-  }
-
-  if (isNeededSaveDevice) {
-    await fetchApiJson(dataUrl, {
-      method: 'POST',
-      headers: { Cookie: sessionCookies },
-      body: {
-        section: 'mobile',
-        method: 'setDeviceId',
-        deviceId: device.id,
-        os: 'Android'
-      }
-    }, response => response.success && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request'))
-  }
-
+  const sessionCookies = cookies(authCallbackRes) || ibankCookies
   ZenMoney.setData('sessionCookies', sessionCookies)
   ZenMoney.saveData()
   return sessionCookies
 }
 
 export async function fetchAccounts (sessionCookies) {
-  console.log('>>> Загрузка списка счетов...')
   const accounts = (await fetchApiJson(dataUrl, {
     method: 'POST',
     headers: { Cookie: sessionCookies },
@@ -342,7 +210,6 @@ export function createDateIntervals (fromDate, toDate) {
 }
 
 export async function fetchTransactions (sessionCookies, account, fromDate, toDate = new Date()) {
-  console.log('>>> Загрузка списка транзакций...')
   toDate = toDate || new Date()
 
   const dates = createDateIntervals(fromDate, toDate)
@@ -361,11 +228,8 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
   ))
 
   const operations = flatMap(responses, response => {
-    return flatMap(response.body.values.history, op => {
-      return op
-    })
+    return flatMap(response.body.values.history, op => op)
   })
 
-  console.log(`>>> Загружено ${operations.length} операций.`)
   return operations
 }

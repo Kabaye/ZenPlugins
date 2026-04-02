@@ -8,10 +8,7 @@ describe('scrape', () => {
   it('should hit the mocks and return results', async () => {
     mockZenMoney()
     mockApiIbankInit()
-    mockApiSignin()
-    mockApiCloseLastSession()
     mockApiAuthCallback()
-    mockApiSaveDevice()
     mockApiFetchAccounts()
     mockApiFetchTransactions()
 
@@ -267,95 +264,17 @@ function mockApiFetchAccounts () {
   })
 }
 
-function mockApiSaveDevice () {
-  fetchMock.once({
-    method: 'POST',
-    headers: { Cookie: 'PHPSESSID=ibanksession;' },
-    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && _.isEqual(body, stringify({
-      section: 'mobile',
-      method: 'setDeviceId',
-      deviceId: 'device id',
-      os: 'Android'
-    })),
-    response: {
-      status: 200,
-      body: {
-        status: 'OK',
-        values: {
-          chooseHistoryPeriod: null,
-          coursesType: 'cards',
-          currentCard: {
-            balance: '99,90 BYN',
-            cardImage: '/core/assets/redesign3/images/cardsLogo/belcard_mini2.svg',
-            cardName: '',
-            cardNum: '**** 111',
-            clearBalance: 99.9,
-            currency: 'BYN',
-            type: 'БЕЛКАРТ-Maestro',
-            enableCorp: '1',
-            enableSimple: '1',
-            info: 'Упрощенный вход в систему включен',
-            showMenuBlock: true,
-            siteArea: 'physicist',
-            _appName: 'simple'
-          }
-        }
-      }
-    }
-  })
-}
-
-function mockApiSignin () {
-  let callCount = 0
-  const signinMatcher = (url, { body }) => url === 'https://login.belinvestbank.by/app_api' && _.isEqual(body, stringify({
-    section: 'account',
-    method: 'signin',
-    login: '123456789',
-    password: 'pass',
-    deviceId: 'device id',
-    versionApp: '2.25.0',
-    os: 'Android',
-    device_token: 'device token',
-    device_token_type: 'ANDROID'
-  }))
-  fetchMock.mock(signinMatcher, () => {
-    callCount++
-    if (callCount === 1) {
-      return {
-        status: 200,
-        body: JSON.stringify({
-          isNeedConfirmSessionKey: '1',
-          message: 'Внимание! Система "Интернет-банкинг" уже запущена, повторный запуск запрещен.',
-          status: 'ER',
-          textMessage: 'Внимание! Система "Мобильный банкинг" уже запущена, повторный запуск запрещен. Вы хотите аннулировать предыдущий запуск системы?'
-        })
-      }
-    }
-    return {
-      status: 200,
-      body: JSON.stringify({
-        status: 'OK',
-        values: {
-          login: 'Kabaye',
-          clientName: 'Vasiliy',
-          authCode: 'auth code',
-          _appName: 'simple'
-        }
-      })
-    }
-  }, { method: 'POST' })
-}
-
 function mockApiAuthCallback () {
   fetchMock.once({
     method: 'POST',
     matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && _.isEqual(body, stringify({
       section: 'account',
       method: 'authCallback',
-      auth_code: 'auth code'
+      auth_code: 'webviewauthcode'
     })),
     response: {
       status: 200,
+      headers: { 'set-cookie': 'PHPSESSID=ibanksession;' },
       body: {
         status: 'OK',
         values: {
@@ -372,81 +291,15 @@ function mockApiAuthCallback () {
   })
 }
 
-function mockApiSmsCode () {
-  fetchMock.once({
-    method: 'POST',
-    headers: { Cookie: '' },
-    matcher: (url, { body }) => url === 'https://login.belinvestbank.by/app_api' && _.isEqual(body, stringify({
-      section: 'account',
-      method: 'signin2',
-      action: 1,
-      key: '1234',
-      device_token: 'device token',
-      device_token_type: 'ANDROID'
-    })),
-    response: {
-      status: 200,
-      body: {
-        status: 'OK',
-        values: {
-          authCode: 'auth code',
-          _appName: 'simple'
-        }
-      }
-    }
-  })
-}
-
-function mockApiCloseLastSession () {
-  fetchMock.once({
-    method: 'POST',
-    matcher: (url, { body }) => url === 'https://login.belinvestbank.by/app_api' && _.isEqual(body, stringify({
-      section: 'account',
-      method: 'confirmationCloseSession'
-    })),
-    response: {
-      status: 200,
-      body: {
-        status: 'OK',
-        values: {
-          avatarSrc: 'https://ibank.belinvestbank.by/avatars/user_3.jpg',
-          clientIO: 'Василий Викторович',
-          clientLastName: 'Пупкин',
-          clientName: 'Василий',
-          clientPhone: '3752911***11',
-          clientThirdName: 'Викторович',
-          denominationData: {
-            startDate: '01.07.2016',
-            dateEndBYR: '31.12.2016',
-            currency: 'BYN',
-            amtMask: 'moneyDec2',
-            decimal: 2
-          },
-          amtMask: 'moneyDec2',
-          currency: 'BYN',
-          dateEndBYR: '31.12.2016',
-          decimal: 2,
-          startDate: '01.07.2016',
-          greetingPartDay: 'Добрый день',
-          isAppUser: false,
-          isSendPush: true,
-          isSnap: true,
-          login: 'login',
-          personPict: 'user_3',
-          userImage: 'user_3',
-          _appName: 'simple'
-        }
-      }
-    }
-  })
-}
-
 function mockZenMoney () {
   global.ZenMoney = {
-    ...makePluginDataApi({
-      deviceId: 'device id',
-      token: 'device token'
-    }).methods
+    ...makePluginDataApi({}).methods
   }
-  ZenMoney.readLine = async () => '1234'
+  // Simulate the bank's WebView flow: intercept the authCallback redirect and return auth_code
+  ZenMoney.openWebView = (url, headers, requestCb, completionCb) => {
+    requestCb(
+      { url: 'https://ibank.belinvestbank.by/authCallback?auth_code=webviewauthcode', headers: {} },
+      completionCb
+    )
+  }
 }
