@@ -24,7 +24,7 @@ const WEB_HEADERS = {
 }
 
 function extractJsData (html) {
-  const prefix = 'var jsData = '
+  const prefix = html.indexOf('window.jsData = ') >= 0 ? 'window.jsData = ' : 'var jsData = '
   const idx = html.indexOf(prefix)
   if (idx < 0) throw new Error('Cannot find jsData on login page')
   const start = idx + prefix.length
