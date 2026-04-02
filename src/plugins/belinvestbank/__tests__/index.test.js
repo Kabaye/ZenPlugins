@@ -11,14 +11,6 @@ var jsData = {"alphabet":{"lang":["a","b","c","d","e","f","g","h","i","j","k","l
 </body></html>`
 
 describe('scrape', () => {
-  beforeEach(() => {
-    // Fix Date.now so the 120-day cap is deterministic
-    jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-04-02T00:00:00.000Z').getTime())
-  })
-  afterEach(() => {
-    jest.restoreAllMocks()
-  })
-
   it('should hit the mocks and return results', async () => {
     mockZenMoney()
     mockWebSigninPage()
