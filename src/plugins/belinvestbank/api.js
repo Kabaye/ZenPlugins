@@ -1,9 +1,50 @@
 import { defaultsDeep, flatMap } from 'lodash'
 import { stringify } from 'querystring'
 import { createDateIntervals as commonCreateDateIntervals } from '../../common/dateUtils'
-import { fetchJson, openWebViewAndInterceptRequest } from '../../common/network'
+import { fetch, fetchJson } from '../../common/network'
+import { InvalidOtpCodeError } from '../../errors'
 
 const dataUrl = 'https://ibank.belinvestbank.by/app_api'
+const loginWebUrl = 'https://login.belinvestbank.by'
+
+// Minimal browser fingerprint sent with the web login form
+const DEVICE_PRINT = Buffer.from(JSON.stringify({
+  'navigator.appCodeName': 'Mozilla',
+  'navigator.language': 'ru',
+  'navigator.platform': 'Android',
+  'screen.height': 1920,
+  'screen.width': 1080,
+  'screen.colorDepth': 24
+})).toString('base64')
+
+const WEB_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'ru-RU,ru;q=0.9'
+}
+
+function extractJsData (html) {
+  const prefix = 'var jsData = '
+  const idx = html.indexOf(prefix)
+  if (idx < 0) throw new Error('Cannot find jsData on login page')
+  const start = idx + prefix.length
+  let depth = 0
+  let i = start
+  while (i < html.length) {
+    if (html[i] === '{') depth++
+    else if (html[i] === '}') { depth--; if (depth === 0) break }
+    i++
+  }
+  return JSON.parse(html.slice(start, i + 1))
+}
+
+function encryptPassword (password, alphabet) {
+  const { lang, keyLang } = alphabet
+  return password.split('').map(char => {
+    const idx = lang.indexOf(char)
+    return idx >= 0 ? String.fromCharCode(keyLang[idx]) : char
+  }).join('')
+}
 
 async function fetchApiJson (url, options, predicate = () => true, error = (message) => console.assert(false, message)) {
   options = defaultsDeep(
@@ -133,7 +174,85 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
     }
   }
 
-  // Get initial ibank session (required as base for authCallback)
+  // Step 1: GET login page — get PHPSESSID + alphabet for password encryption
+  const loginPageRes = await fetch(loginWebUrl + '/signin', {
+    method: 'GET',
+    headers: { ...WEB_HEADERS },
+    sanitizeResponseLog: { headers: { 'set-cookie': true } }
+  })
+  let webCookies = cookies(loginPageRes)
+  const jsData = extractJsData(loginPageRes.body)
+  const encryptedPassword = encryptPassword(password, jsData.alphabet)
+
+  // Step 2: POST credentials to web login form — triggers OTP SMS
+  let signinRes = await fetch(loginWebUrl + '/signin', {
+    method: 'POST',
+    redirect: 'manual',
+    headers: {
+      ...WEB_HEADERS,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: webCookies,
+      Referer: loginWebUrl + '/signin'
+    },
+    body: stringify({
+      login,
+      password: encryptedPassword,
+      typeSessionKey: 0,
+      devicePrint: DEVICE_PRINT
+    }),
+    sanitizeRequestLog: { body: { login: true, password: true } },
+    sanitizeResponseLog: { headers: { 'set-cookie': true } }
+  })
+  const newCookies = cookies(signinRes)
+  if (newCookies) webCookies = newCookies
+
+  // Handle session conflict: bank redirects back to /signin when another session is active
+  const signinLocation = signinRes.headers.location || signinRes.headers.Location || ''
+  if (signinLocation.includes('/signin') && !signinLocation.includes('/signin2')) {
+    signinRes = await fetch(loginWebUrl + '/confirmationCloseSession', {
+      method: 'POST',
+      redirect: 'manual',
+      headers: {
+        ...WEB_HEADERS,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: webCookies,
+        Referer: loginWebUrl + '/signin'
+      },
+      sanitizeResponseLog: { headers: { 'set-cookie': true } }
+    })
+    const closedCookies = cookies(signinRes)
+    if (closedCookies) webCookies = closedCookies
+  }
+
+  // Step 3: Ask user for OTP code sent to their phone
+  const otpCode = await ZenMoney.readLine('Введите код из СМС для входа в Белинвестбанк', {
+    time: 120000,
+    inputType: 'number'
+  })
+  if (!otpCode || !otpCode.trim()) throw new InvalidOtpCodeError()
+
+  // Step 4: Submit OTP — bank redirects to ibank/authCallback?auth_code=XXX
+  const signin2Res = await fetch(loginWebUrl + '/signin2', {
+    method: 'POST',
+    redirect: 'manual',
+    headers: {
+      ...WEB_HEADERS,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: webCookies,
+      Referer: loginWebUrl + '/signin2'
+    },
+    body: stringify({ action: 1, key: otpCode.trim() }),
+    sanitizeRequestLog: { body: { key: true } },
+    sanitizeResponseLog: { headers: { 'set-cookie': true } }
+  })
+
+  // Extract auth_code from the redirect Location header
+  const authCallbackLocation = signin2Res.headers.location || signin2Res.headers.Location || ''
+  const authCodeMatch = authCallbackLocation.match(/auth_code=([^&]+)/)
+  if (!authCodeMatch) throw new InvalidOtpCodeError()
+  const authCode = authCodeMatch[1]
+
+  // Step 5: Init ibank session and complete auth via authCallback
   const ibankInitRes = await fetchJson(dataUrl, {
     method: 'POST',
     headers: {
@@ -149,31 +268,12 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   })
   const ibankCookies = cookies(ibankInitRes)
 
-  // Authenticate via bank's web UI: user logs in and completes OTP in a WebView.
-  // We intercept the redirect to ibank/authCallback to capture the auth_code.
-  const authCode = await openWebViewAndInterceptRequest({
-    url: 'https://login.belinvestbank.by/signin',
-    sanitizeRequestLog: { url: false },
-    intercept: (request) => {
-      const url = new URL(request.url)
-      if (url.hostname === 'ibank.belinvestbank.by' && url.pathname === '/authCallback') {
-        const code = url.searchParams.get('auth_code')
-        if (code) return code
-      }
-      return null
-    }
-  })
-
   const authCallbackRes = await fetchApiJson(dataUrl, {
     method: 'POST',
     headers: { Cookie: ibankCookies },
-    body: {
-      section: 'account',
-      method: 'authCallback',
-      auth_code: authCode
-    }
+    body: { section: 'account', method: 'authCallback', auth_code: authCode }
   }, response => response.success && response.body.status === 'OK',
-  message => new InvalidPreferencesError('Ошибка авторизации'))
+  () => new InvalidPreferencesError('Ошибка авторизации'))
 
   const sessionCookies = cookies(authCallbackRes) || ibankCookies
   ZenMoney.setData('sessionCookies', sessionCookies)
