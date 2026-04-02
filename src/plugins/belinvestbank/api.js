@@ -313,8 +313,9 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
   toDate = toDate || new Date()
 
   const dates = createDateIntervals(fromDate, toDate)
-  const responses = await Promise.all(dates.map(([dateFrom, dateTo]) =>
-    fetchApiJson(dataUrl, {
+  const operations = []
+  for (const [dateFrom, dateTo] of dates) {
+    const response = await fetchApiJson(dataUrl, {
       method: 'POST',
       headers: { Cookie: sessionCookies },
       body: {
@@ -325,10 +326,8 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
         dateTo: formatDate(dateTo)
       }
     }, () => true, () => null).catch(() => null)
-  ))
-
-  return flatMap(responses, response => {
     const history = response && response.body && response.body.values && response.body.values.history
-    return history ? flatMap(history, op => op) : []
-  })
+    if (history) operations.push(...flatMap(history, op => op))
+  }
+  return operations
 }
