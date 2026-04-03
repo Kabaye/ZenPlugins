@@ -8,8 +8,8 @@ export async function scrape ({ preferences, fromDate, toDate }) {
 
   const transactions = []
   for (const account of accounts) {
-    const { history: apiTransactions, summaryData } = await fetchTransactions(token, account, fromDate, toDate)
-    const patchedAccount = patchAccountFromSummary(account, summaryData)
+    const { history: apiTransactions, summaryData, latestBalanceAmt } = await fetchTransactions(token, account, fromDate, toDate)
+    const patchedAccount = patchAccountFromSummary(account, summaryData, latestBalanceAmt)
     // Reflect patched balance back so transactions reference correct account
     Object.assign(account, patchedAccount)
     for (const apiTransaction of apiTransactions) {

@@ -315,6 +315,7 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
   const dates = createDateIntervals(fromDate, toDate)
   const operations = []
   let summaryData = null
+  let latestBalanceAmt = null
   for (const [dateFrom, dateTo] of dates) {
     const response = await fetchApiJson(dataUrl, {
       method: 'POST',
@@ -329,7 +330,13 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
     }, () => true, () => null).catch(() => null)
     const history = response && response.body && response.body.values && response.body.values.history
     if (response?.body?.values?.summaryData) summaryData = response.body.values.summaryData
-    if (history) operations.push(...flatMap(history, op => op))
+    if (history) {
+      operations.push(...flatMap(history, op => op))
+      // Track the latest transaction's balanceAmt (OSTATOK = real-time available)
+      for (const op of history) {
+        if (op.balanceAmt && op.balanceAmt !== '') latestBalanceAmt = op.balanceAmt
+      }
+    }
   }
-  return { history: operations, summaryData }
+  return { history: operations, summaryData, latestBalanceAmt }
 }

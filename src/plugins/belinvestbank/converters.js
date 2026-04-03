@@ -33,7 +33,7 @@ export function convertAccount (json) {
   }
 }
 
-export function patchAccountFromSummary (account, summaryData) {
+export function patchAccountFromSummary (account, summaryData, latestBalanceAmt = null) {
   if (!summaryData) return account
   // Only patch if payments/index returned no balance info
   if (account.balance !== 0 || account.creditLimit !== 0) return account
@@ -41,11 +41,12 @@ export function patchAccountFromSummary (account, summaryData) {
   const availableAmt = parseAmount(summaryData.availableSum) ?? 0
   const freeAmt = parseAmount(summaryData.freeSum) ?? 0
   if (overdraftAmt > 0) {
-    // Credit card: freeSum = real-time available credit (includes pending/authorized)
-    // balance = freeSum - overdraftSum matches SMS OSTATOK: available - limit = debt (negative)
+    // Credit card: use latest transaction's balanceAmt (OSTATOK = real-time available credit)
+    // Falls back to availableSum (settled only) if no transaction balance available
+    const availableCredit = parseAmount(latestBalanceAmt) ?? availableAmt
     return {
       ...account,
-      balance: Math.round((freeAmt - overdraftAmt) * 100) / 100,
+      balance: Math.round((availableCredit - overdraftAmt) * 100) / 100,
       creditLimit: Math.round(overdraftAmt * 100) / 100
     }
   }
