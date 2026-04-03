@@ -38,6 +38,9 @@ export function convertTransaction (json, account) {
     return null
   }
 
+  const sum = getSumAmount(json)
+  if (sum === 0) return null
+
   const transaction = {
     date: getDate(json.date),
     movements: [
@@ -45,7 +48,7 @@ export function convertTransaction (json, account) {
         id: null,
         account: { id: account.id },
         invoice: null,
-        sum: getSumAmount(json),
+        sum,
         fee: 0
       }
     ],
