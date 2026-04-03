@@ -8,7 +8,6 @@ function setupProxyServer (state) {
   // eslint-disable-next-line new-cap
   const proxy = new httpProxy.createProxyServer()
   proxy.on('proxyRes', (proxyRes, req, res) => {
-    console.log(`[PROXY] ${req.method} ${req.url} → ${proxyRes.statusCode}`)
     if (proxyRes.headers['set-cookie']) {
       const now = new Date()
       for (const cookieStr of proxyRes.headers['set-cookie']) {
