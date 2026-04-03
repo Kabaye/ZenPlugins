@@ -9,13 +9,23 @@ export async function scrape ({ preferences, fromDate, toDate }) {
   const transactions = []
   for (const account of accounts) {
     const { history: apiTransactions, summaryData, msCardId } = await fetchTransactions(token, account, fromDate, toDate)
-    let realTimeBalance = null
-    if (msCardId && summaryData && (parseFloat(summaryData.overdraftSum) || 0) > 0) {
-      realTimeBalance = await fetchCardBalance(token, msCardId)
+    if (msCardId) {
+      const realTimeBalance = await fetchCardBalance(token, msCardId)
+      if (realTimeBalance !== null) {
+        const parsedBalance = parseFloat(realTimeBalance)
+        const overdraftAmt = parseFloat(summaryData?.overdraftSum || 0) || 0
+        if (overdraftAmt > 0) {
+          account.balance = Math.round((parsedBalance - overdraftAmt) * 100) / 100
+          account.creditLimit = overdraftAmt
+        } else {
+          account.balance = Math.round(parsedBalance * 100) / 100
+        }
+      } else {
+        Object.assign(account, patchAccountFromSummary(account, summaryData))
+      }
+    } else {
+      Object.assign(account, patchAccountFromSummary(account, summaryData))
     }
-    const patchedAccount = patchAccountFromSummary(account, summaryData, realTimeBalance)
-    // Reflect patched balance back so transactions reference correct account
-    Object.assign(account, patchedAccount)
     for (const apiTransaction of apiTransactions) {
       const transaction = convertTransaction(apiTransaction, account)
       if (transaction) {

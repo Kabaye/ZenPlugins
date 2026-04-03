@@ -33,7 +33,7 @@ export function convertAccount (json) {
   }
 }
 
-export function patchAccountFromSummary (account, summaryData, realTimeBalance = null) {
+export function patchAccountFromSummary (account, summaryData) {
   if (!summaryData) return account
   // Only patch if payments/index returned no balance info
   if (account.balance !== 0 || account.creditLimit !== 0) return account
@@ -41,12 +41,10 @@ export function patchAccountFromSummary (account, summaryData, realTimeBalance =
   const availableAmt = parseAmount(summaryData.availableSum) ?? 0
   const freeAmt = parseAmount(summaryData.freeSum) ?? 0
   if (overdraftAmt > 0) {
-    // Credit card: realTimeBalance = available credit from balance-by-card API (matches SMS OSTATOK)
-    // Falls back to availableSum (settled only) if API call failed
-    const availableCredit = parseAmount(realTimeBalance) ?? availableAmt
+    // Credit card fallback: use availableSum - overdraftSum (settled balance only)
     return {
       ...account,
-      balance: Math.round((availableCredit - overdraftAmt) * 100) / 100,
+      balance: Math.round((availableAmt - overdraftAmt) * 100) / 100,
       creditLimit: Math.round(overdraftAmt * 100) / 100
     }
   }
@@ -171,7 +169,15 @@ function parsePayee (transaction, json) {
 function getSumAmount (json) {
   const amountAccount = Number.parseFloat(json.accountAmt.replace(',', '.').replace(' ', ''))
   const amountReflected = Number.parseFloat(json.reflectedAccountAmt?.replace(',', '.').replace(' ', ''))
-  const amount = amountAccount === 0 && !isNaN(amountReflected) && amountReflected !== 0 ? amountReflected : amountAccount
+  const amountTransaction = Number.parseFloat(json.transactionAmt?.replace(',', '.').replace(' ', ''))
+  let amount
+  if (amountAccount === 0 && !isNaN(amountReflected) && amountReflected !== 0) {
+    amount = amountReflected
+  } else if (amountAccount === 0 && !isNaN(amountTransaction) && amountTransaction !== 0) {
+    amount = amountTransaction
+  } else {
+    amount = amountAccount
+  }
   let sum = null
   if (json.sign) {
     sum = json.sign === '+' ? amount : -amount
