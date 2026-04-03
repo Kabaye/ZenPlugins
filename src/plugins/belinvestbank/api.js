@@ -314,6 +314,7 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
 
   const dates = createDateIntervals(fromDate, toDate)
   const operations = []
+  let summaryData = null
   for (const [dateFrom, dateTo] of dates) {
     const response = await fetchApiJson(dataUrl, {
       method: 'POST',
@@ -327,7 +328,8 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
       }
     }, () => true, () => null).catch(() => null)
     const history = response && response.body && response.body.values && response.body.values.history
+    if (response?.body?.values?.summaryData) summaryData = response.body.values.summaryData
     if (history) operations.push(...flatMap(history, op => op))
   }
-  return operations
+  return { history: operations, summaryData }
 }

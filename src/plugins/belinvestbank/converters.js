@@ -33,6 +33,24 @@ export function convertAccount (json) {
   }
 }
 
+export function patchAccountFromSummary (account, summaryData) {
+  if (!summaryData) return account
+  // Only patch if payments/index returned no balance info
+  if (account.balance !== 0 || account.creditLimit !== 0) return account
+  const overdraftAmt = parseAmount(summaryData.overdraftSum) ?? 0
+  const availableAmt = parseAmount(summaryData.availableSum) ?? 0
+  const freeAmt = parseAmount(summaryData.freeSum) ?? 0
+  if (overdraftAmt > 0) {
+    return {
+      ...account,
+      balance: Math.round((availableAmt - overdraftAmt) * 100) / 100,
+      creditLimit: Math.round(availableAmt * 100) / 100
+    }
+  }
+  const bal = freeAmt || availableAmt
+  return bal !== 0 ? { ...account, balance: Math.round(bal * 100) / 100 } : account
+}
+
 export function convertTransaction (json, account) {
   if ((json.status !== 'ПРОВЕДЕНО' && json.status !== 'ЗАБЛОКИРОВАНО') || json.accountAmt === '') {
     return null
