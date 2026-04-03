@@ -84,8 +84,8 @@ export function convertTransaction (json, account) {
 
   if (json.mcc) {
     transaction.comment = transaction.comment
-      ? `${transaction.comment} | ${json.mcc}`
-      : json.mcc
+      ? `${transaction.comment} | MCC: ${json.mcc}`
+      : `MCC: ${json.mcc}`
   }
 
   return transaction
