@@ -289,7 +289,7 @@ export async function fetchAccounts (sessionCookies) {
       section: 'payments',
       method: 'index'
     }
-  }, response => response.success && response.body.status && response.body.status === 'OK',
+  }, response => response.ok && response.body?.status === 'OK',
   message => new InvalidPreferencesError('bad request')))
   return accounts.body.values.cards
 }
