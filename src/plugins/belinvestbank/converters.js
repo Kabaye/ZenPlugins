@@ -82,6 +82,12 @@ export function convertTransaction (json, account) {
     parsePayee
   ].some(parser => parser(transaction, json))
 
+  if (json.mcc) {
+    transaction.comment = transaction.comment
+      ? `${transaction.comment} | ${json.mcc}`
+      : json.mcc
+  }
+
   return transaction
 }
 
