@@ -41,10 +41,13 @@ export function patchAccountFromSummary (account, summaryData) {
   const availableAmt = parseAmount(summaryData.availableSum) ?? 0
   const freeAmt = parseAmount(summaryData.freeSum) ?? 0
   if (overdraftAmt > 0) {
+    // Credit card: use debtSum + lockedSum for real-time balance (includes authorized/pending)
+    const debtAmt = parseAmount(summaryData.debtSum) ?? 0
+    const lockedAmt = parseAmount(summaryData.lockedSum) ?? 0
     return {
       ...account,
-      balance: Math.round((availableAmt - overdraftAmt) * 100) / 100,
-      creditLimit: Math.round(availableAmt * 100) / 100
+      balance: Math.round(-(debtAmt + lockedAmt) * 100) / 100,
+      creditLimit: Math.round(overdraftAmt * 100) / 100
     }
   }
   const bal = freeAmt || availableAmt
