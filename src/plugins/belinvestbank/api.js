@@ -315,7 +315,7 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
   const dates = createDateIntervals(fromDate, toDate)
   const operations = []
   let summaryData = null
-  let latestBalanceAmt = null
+  let msCardId = null
   for (const [dateFrom, dateTo] of dates) {
     const response = await fetchApiJson(dataUrl, {
       method: 'POST',
@@ -330,13 +330,24 @@ export async function fetchTransactions (sessionCookies, account, fromDate, toDa
     }, () => true, () => null).catch(() => null)
     const history = response && response.body && response.body.values && response.body.values.history
     if (response?.body?.values?.summaryData) summaryData = response.body.values.summaryData
-    if (history) {
-      operations.push(...flatMap(history, op => op))
-      // Track the latest transaction's balanceAmt (OSTATOK = real-time available)
-      for (const op of history) {
-        if (op.balanceAmt && op.balanceAmt !== '') latestBalanceAmt = op.balanceAmt
-      }
+    if (!msCardId) {
+      const cards = response?.body?.values?.cards
+      if (cards && cards.length > 0 && cards[0].msCardId) msCardId = cards[0].msCardId
     }
+    if (history) operations.push(...flatMap(history, op => op))
   }
-  return { history: operations, summaryData, latestBalanceAmt }
+  return { history: operations, summaryData, msCardId }
+}
+
+export async function fetchCardBalance (sessionCookies, msCardId) {
+  const ibankUrl = 'https://ibank.belinvestbank.by/cards/balance-by-card'
+  const response = await fetchApiJson(ibankUrl, {
+    method: 'POST',
+    headers: { Cookie: sessionCookies },
+    body: { msCardId }
+  }, () => true, () => null).catch(() => null)
+  if (response?.body?.status === 'OK' && response.body.balance != null) {
+    return response.body.balance
+  }
+  return null
 }

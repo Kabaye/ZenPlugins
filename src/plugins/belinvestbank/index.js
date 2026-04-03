@@ -1,4 +1,4 @@
-import { fetchAccounts, fetchTransactions, login } from './api'
+import { fetchAccounts, fetchCardBalance, fetchTransactions, login } from './api'
 import { convertAccount, convertTransaction, patchAccountFromSummary } from './converters'
 
 export async function scrape ({ preferences, fromDate, toDate }) {
@@ -8,8 +8,12 @@ export async function scrape ({ preferences, fromDate, toDate }) {
 
   const transactions = []
   for (const account of accounts) {
-    const { history: apiTransactions, summaryData, latestBalanceAmt } = await fetchTransactions(token, account, fromDate, toDate)
-    const patchedAccount = patchAccountFromSummary(account, summaryData, latestBalanceAmt)
+    const { history: apiTransactions, summaryData, msCardId } = await fetchTransactions(token, account, fromDate, toDate)
+    let realTimeBalance = null
+    if (msCardId && summaryData && (parseFloat(summaryData.overdraftSum) || 0) > 0) {
+      realTimeBalance = await fetchCardBalance(token, msCardId)
+    }
+    const patchedAccount = patchAccountFromSummary(account, summaryData, realTimeBalance)
     // Reflect patched balance back so transactions reference correct account
     Object.assign(account, patchedAccount)
     for (const apiTransaction of apiTransactions) {
