@@ -220,16 +220,21 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   sessionCookies = cookies(res)
 
   if (isNeededSaveDevice) {
-    await fetchApiJson(dataUrl, {
-      method: 'POST',
-      headers: { Cookie: sessionCookies },
-      body: {
-        section: 'mobile',
-        method: 'setDeviceId',
-        deviceId: device.id,
-        os: 'Android'
-      }
-    }, response => response.ok && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request'))
+    try {
+      await fetchApiJson(dataUrl, {
+        method: 'POST',
+        headers: { Cookie: sessionCookies },
+        body: {
+          section: 'mobile',
+          method: 'setDeviceId',
+          deviceId: device.id,
+          os: 'Android'
+        }
+      }, response => response.ok && response.body.status && response.body.status === 'OK', () => {})
+      console.log('Device registered successfully')
+    } catch (e) {
+      console.log('setDeviceId failed (non-fatal), SMS will be needed next time:', e.message)
+    }
   }
 
   ZenMoney.setData('sessionCookies', sessionCookies)
