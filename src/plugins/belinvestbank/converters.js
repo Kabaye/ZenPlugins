@@ -41,12 +41,11 @@ export function patchAccountFromSummary (account, summaryData) {
   const availableAmt = parseAmount(summaryData.availableSum) ?? 0
   const freeAmt = parseAmount(summaryData.freeSum) ?? 0
   if (overdraftAmt > 0) {
-    // Credit card: use debtSum + lockedSum for real-time balance (includes authorized/pending)
-    const debtAmt = parseAmount(summaryData.debtSum) ?? 0
-    const lockedAmt = parseAmount(summaryData.lockedSum) ?? 0
+    // Credit card: freeSum = real-time available credit (includes pending/authorized)
+    // balance = freeSum - overdraftSum matches SMS OSTATOK: available - limit = debt (negative)
     return {
       ...account,
-      balance: Math.round(-(debtAmt + lockedAmt) * 100) / 100,
+      balance: Math.round((freeAmt - overdraftAmt) * 100) / 100,
       creditLimit: Math.round(overdraftAmt * 100) / 100
     }
   }
