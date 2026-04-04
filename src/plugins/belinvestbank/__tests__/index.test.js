@@ -169,7 +169,28 @@ function mockApiSaveDevice () {
       body: {
         status: 'OK',
         values: {
-          info: 'Simplified login enabled',
+          info: 'SMS sent for device binding',
+          _appName: 'simple'
+        }
+      }
+    }
+  })
+
+  fetchMock.once({
+    method: 'POST',
+    headers: { Cookie: 'PHPSESSID=ibanksession;' },
+    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && _.isEqual(body, stringify({
+      section: 'mobile',
+      method: 'setDevice',
+      deviceId: 'device id',
+      code: '5678'
+    })),
+    response: {
+      status: 200,
+      body: {
+        status: 'OK',
+        values: {
+          info: 'Device registered',
           _appName: 'simple'
         }
       }
@@ -362,5 +383,9 @@ function mockZenMoney () {
       token: 'device token'
     }).methods
   }
-  ZenMoney.readLine = async () => '1234'
+  let readLineCallCount = 0
+  ZenMoney.readLine = async () => {
+    readLineCallCount++
+    return readLineCallCount === 1 ? '1234' : '5678'
+  }
 }

@@ -249,6 +249,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
 
   if (isNeededSaveDevice) {
     try {
+      console.log('[LOGIN] Step 1: setDeviceId...')
       await fetchApiJson(dataUrl, {
         method: 'POST',
         headers: { Cookie: sessionCookies },
@@ -258,10 +259,32 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
           deviceId: device.id,
           os: 'Android'
         }
-      }, response => response.ok && response.body.status && response.body.status === 'OK', () => {})
-      console.log('Device registered successfully')
+      }, response => response.ok, () => {})
+
+      console.log('[LOGIN] Step 2: Waiting for device binding SMS code...')
+      const bindingCode = await ZenMoney.readLine('Введите код привязки устройства из СМС (код для привязки мобильного приложения)', {
+        time: 120000,
+        inputType: 'number'
+      })
+      if (!bindingCode || !bindingCode.trim()) {
+        console.log('[LOGIN] No binding code entered, device not registered')
+      } else {
+        console.log('[LOGIN] Step 3: setDevice with binding code...')
+        const setDeviceRes = await fetchApiJson(dataUrl, {
+          method: 'POST',
+          headers: { Cookie: sessionCookies },
+          body: {
+            section: 'mobile',
+            method: 'setDevice',
+            deviceId: device.id,
+            code: bindingCode.trim()
+          }
+        }, response => response.ok, () => {})
+        console.log('[LOGIN] setDevice response:', JSON.stringify(setDeviceRes.body))
+        console.log('Device registered successfully')
+      }
     } catch (e) {
-      console.log('setDeviceId failed (non-fatal), SMS will be needed next time:', e.message)
+      console.log('Device binding failed (non-fatal), SMS will be needed next time:', e.message)
     }
   }
 
