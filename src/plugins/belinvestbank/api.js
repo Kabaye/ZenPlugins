@@ -162,9 +162,12 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
       password,
       deviceId: device.id,
       versionApp: APP_VERSION,
+      deviceName: 'Samsung SM-G991B',
       os: 'Android',
+      AndroidVersion: '34',
       device_token: device.token,
-      device_token_type: 'ANDROID'
+      device_token_type: 'ANDROID',
+      typeSessionKey: '0'
     },
     sanitizeRequestLog: { body: { login: true, password: true } }
   }, response => response.ok, message => new InvalidPreferencesError('Неверный логин или пароль')))
