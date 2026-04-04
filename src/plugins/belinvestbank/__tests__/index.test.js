@@ -56,29 +56,56 @@ describe('scrape', () => {
 })
 
 function mockApiLoginAndPass () {
+  let signinCallCount = 0
+  const signinMatcher = (url, { body }) => url === 'https://login.belinvestbank.by/app_api' && _.isEqual(body, stringify({
+    section: 'account',
+    method: 'signin',
+    login: '123456789',
+    password: 'pass',
+    deviceId: 'device id',
+    versionApp: '2.25.0',
+    deviceName: 'Samsung SM-S926B',
+    os: 'Android',
+    AndroidVersion: '34',
+    device_token: 'device token',
+    device_token_type: 'ANDROID',
+    typeSessionKey: '0'
+  }))
+
+  // First signin: session conflict
   fetchMock.once({
     method: 'POST',
-    matcher: (url, { body }) => url === 'https://login.belinvestbank.by/app_api' && _.isEqual(body, stringify({
-      section: 'account',
-      method: 'signin',
-      login: '123456789',
-      password: 'pass',
-      deviceId: 'device id',
-      versionApp: '2.25.0',
-      deviceName: 'Samsung SM-S926B',
-      os: 'Android',
-      AndroidVersion: '34',
-      device_token: 'device token',
-      device_token_type: 'ANDROID',
-      typeSessionKey: '0'
-    })),
-    response: {
-      status: 200,
-      body: {
-        isNeedConfirmSessionKey: '1',
-        message: 'System already running',
-        status: 'ER',
-        textMessage: 'Session conflict'
+    matcher: (url, opts) => signinCallCount === 0 && signinMatcher(url, opts),
+    response: () => {
+      signinCallCount++
+      return {
+        status: 200,
+        body: {
+          isNeedConfirmSessionKey: '1',
+          message: 'System already running',
+          status: 'ER',
+          textMessage: 'Session conflict'
+        }
+      }
+    }
+  })
+
+  // Re-signin after closing old session: SMS needed (no authCode)
+  fetchMock.once({
+    method: 'POST',
+    matcher: (url, opts) => signinCallCount === 1 && signinMatcher(url, opts),
+    response: () => {
+      signinCallCount++
+      return {
+        status: 200,
+        body: {
+          status: 'OK',
+          values: {
+            clientName: 'Vasiliy',
+            greetingPartDay: 'Good day',
+            _appName: 'simple'
+          }
+        }
       }
     }
   })

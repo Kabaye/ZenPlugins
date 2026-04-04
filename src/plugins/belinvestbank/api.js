@@ -189,17 +189,37 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   console.log('[LOGIN] isNeedConfirmSessionKey:', res.body.isNeedConfirmSessionKey)
 
   if (res.body.isNeedConfirmSessionKey) {
-    console.log('[LOGIN] Confirming close session...')
-    res = (await fetchApiJson(loginUrl, {
+    console.log('[LOGIN] Session conflict detected, closing old session...')
+    await fetchApiJson(loginUrl, {
       method: 'POST',
       headers: { Cookie: sessionCookies },
       body: {
         section: 'account',
         method: 'confirmationCloseSession'
       }
-    }, response => response.ok, message => new InvalidPreferencesError('bad request')))
+    }, response => response.ok, message => new InvalidPreferencesError('bad request'))
+    console.log('[LOGIN] Old session closed, re-signing in...')
+
+    res = (await fetchApiJson(loginUrl, {
+      method: 'POST',
+      body: {
+        section: 'account',
+        method: 'signin',
+        login,
+        password,
+        deviceId: device.id,
+        versionApp: APP_VERSION,
+        deviceName: 'Samsung SM-S926B',
+        os: 'Android',
+        AndroidVersion: '34',
+        device_token: device.token,
+        device_token_type: 'ANDROID',
+        typeSessionKey: '0'
+      },
+      sanitizeRequestLog: { body: { login: true, password: true } }
+    }, response => response.ok, message => new InvalidPreferencesError('Неверный логин или пароль')))
     sessionCookies = cookies(res)
-    console.log('[LOGIN] Session closed, response:', JSON.stringify(res.body))
+    console.log('[LOGIN] Re-signin response:', JSON.stringify(res.body))
   }
 
   let isNeededSaveDevice = false
