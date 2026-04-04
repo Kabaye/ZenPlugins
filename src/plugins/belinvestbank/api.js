@@ -268,45 +268,48 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
     const deviceHeaders = {
       'Content-Type': 'application/x-www-form-urlencoded',
       Cookie: sessionCookies,
-      'zp-cookie': sessionCookies
+      'zp-cookie': sessionCookies,
+      deviceId: device.id
     }
 
-    console.log('[LOGIN] Step 1: setDevice without code (triggering binding SMS)...')
+    console.log('[LOGIN] Step 1: setDeviceId (triggering binding SMS)...')
     try {
-      const triggerRes = await fetchJson(mobileApiUrl + '/setDevice', {
+      const triggerRes = await fetchJson(mobileApiUrl + '/setDeviceId', {
         method: 'POST',
         headers: deviceHeaders,
-        body: { deviceId: device.id },
+        body: { deviceId: device.id, os: 'Android' },
         stringify,
         sanitizeRequestLog: { headers: { Cookie: true } },
         sanitizeResponseLog: { headers: { 'set-cookie': true } }
       })
-      console.log('[LOGIN] setDevice trigger response:', JSON.stringify(triggerRes.body))
+      console.log('[LOGIN] setDeviceId trigger response:', JSON.stringify(triggerRes.body))
 
-      if (triggerRes.body && triggerRes.body.code === 'smsActivation') {
+      const responseCode = triggerRes.body?.code
+      if (responseCode === 'smsActivation' || responseCode === 'smsActivationCode') {
         console.log('[LOGIN] Step 2: SMS activation required, waiting for code...')
         const bindingCode = await ZenMoney.readLine('Введите код привязки устройства из СМС (код для привязки мобильного приложения)', {
           time: 120000,
           inputType: 'number'
         })
         if (bindingCode && bindingCode.trim()) {
-          console.log('[LOGIN] Step 3: setDevice with binding code...')
-          const setDeviceRes = await fetchJson(mobileApiUrl + '/setDevice', {
+          console.log('[LOGIN] Step 3: setDeviceId with binding code...')
+          const confirmRes = await fetchJson(mobileApiUrl + '/setDeviceId', {
             method: 'POST',
             headers: deviceHeaders,
             body: {
               deviceId: device.id,
+              os: 'Android',
               code: bindingCode.trim()
             },
             stringify,
             sanitizeRequestLog: { headers: { Cookie: true } },
             sanitizeResponseLog: { headers: { 'set-cookie': true } }
           })
-          console.log('[LOGIN] setDevice final response:', JSON.stringify(setDeviceRes.body))
-          if (setDeviceRes.body && setDeviceRes.body.status === 'OK') {
+          console.log('[LOGIN] setDeviceId confirm response:', JSON.stringify(confirmRes.body))
+          if (confirmRes.body && confirmRes.body.status === 'OK') {
             console.log('Device registered successfully')
           } else {
-            console.log('[LOGIN] Device binding response not OK:', setDeviceRes.body?.message || 'unknown error')
+            console.log('[LOGIN] Device binding response not OK:', confirmRes.body?.message || 'unknown error')
           }
         } else {
           console.log('[LOGIN] No binding code entered, skipping device registration')
@@ -314,7 +317,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
       } else if (triggerRes.body && triggerRes.body.status === 'OK') {
         console.log('Device registered successfully (no SMS needed)')
       } else {
-        console.log('[LOGIN] Unexpected setDevice response:', triggerRes.body?.message || 'unknown')
+        console.log('[LOGIN] Unexpected setDeviceId response:', JSON.stringify(triggerRes.body))
       }
     } catch (e) {
       console.log('[LOGIN] Device binding failed (non-fatal):', e.message)

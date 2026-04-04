@@ -182,17 +182,17 @@ function mockApiAuthCallback () {
 }
 
 function mockApiSaveDevice () {
-  let setDeviceCallCount = 0
+  let setDeviceIdCallCount = 0
 
-  // First call: setDevice without code (triggers SMS)
+  // First call: setDeviceId without code (triggers SMS)
   fetchMock.once({
     method: 'POST',
     headers: { Cookie: 'PHPSESSID=ibanksession;' },
-    matcher: (url, { body }) => setDeviceCallCount === 0 &&
-      url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDevice' &&
-      _.isEqual(body, stringify({ deviceId: 'device id' })),
+    matcher: (url, { body }) => setDeviceIdCallCount === 0 &&
+      url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDeviceId' &&
+      _.isEqual(body, stringify({ deviceId: 'device id', os: 'Android' })),
     response: () => {
-      setDeviceCallCount++
+      setDeviceIdCallCount++
       return {
         status: 200,
         body: {
@@ -204,15 +204,15 @@ function mockApiSaveDevice () {
     }
   })
 
-  // Second call: setDevice with binding code
+  // Second call: setDeviceId with binding code
   fetchMock.once({
     method: 'POST',
     headers: { Cookie: 'PHPSESSID=ibanksession;' },
-    matcher: (url, { body }) => setDeviceCallCount === 1 &&
-      url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDevice' &&
-      _.isEqual(body, stringify({ deviceId: 'device id', code: '5678' })),
+    matcher: (url, { body }) => setDeviceIdCallCount === 1 &&
+      url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDeviceId' &&
+      _.isEqual(body, stringify({ deviceId: 'device id', os: 'Android', code: '5678' })),
     response: () => {
-      setDeviceCallCount++
+      setDeviceIdCallCount++
       return {
         status: 200,
         body: {
