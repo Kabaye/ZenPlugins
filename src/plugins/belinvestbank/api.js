@@ -156,6 +156,21 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
         return savedCookies
       }
     } catch (e) {
+      // Session expired — close it preemptively to avoid session conflict on signin
+      console.log('[LOGIN] Saved session invalid, closing it preemptively...')
+      try {
+        await fetchApiJson(loginUrl, {
+          method: 'POST',
+          headers: { Cookie: savedCookies },
+          body: {
+            section: 'account',
+            method: 'confirmationCloseSession'
+          }
+        }, response => response.ok, () => new Error('close failed'))
+        console.log('[LOGIN] Old session closed preemptively')
+      } catch (closeErr) {
+        console.log('[LOGIN] Preemptive close failed (non-fatal):', closeErr.message)
+      }
       ZenMoney.setData('sessionCookies', null)
     }
   }
@@ -188,8 +203,9 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   console.log('[LOGIN] signin response:', JSON.stringify(res.body))
   console.log('[LOGIN] isNeedConfirmSessionKey:', res.body.isNeedConfirmSessionKey)
 
+  // Handle session conflict (should be rare after preemptive close)
   if (res.body.isNeedConfirmSessionKey) {
-    console.log('[LOGIN] Session conflict detected, closing old session...')
+    console.log('[LOGIN] Session conflict detected, closing and retrying...')
     await fetchApiJson(loginUrl, {
       method: 'POST',
       headers: { Cookie: sessionCookies },
@@ -198,7 +214,6 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
         method: 'confirmationCloseSession'
       }
     }, response => response.ok, message => new InvalidPreferencesError('bad request'))
-    console.log('[LOGIN] Old session closed, re-signing in...')
 
     res = (await fetchApiJson(loginUrl, {
       method: 'POST',
