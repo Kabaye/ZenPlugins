@@ -265,62 +265,56 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
 
   if (isNeededSaveDevice) {
     const mobileApiUrl = 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile'
+    const deviceHeaders = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: sessionCookies,
+      'zp-cookie': sessionCookies
+    }
 
-    console.log('[LOGIN] Step 1: setDeviceId (triggering binding SMS)...')
+    console.log('[LOGIN] Step 1: setDevice without code (triggering binding SMS)...')
     try {
-      const setDeviceIdRes = await fetchJson(mobileApiUrl + '/setDeviceId', {
+      const triggerRes = await fetchJson(mobileApiUrl + '/setDevice', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Android',
-          Cookie: sessionCookies,
-          'zp-cookie': sessionCookies
-        },
-        body: {
-          deviceId: device.id,
-          os: 'Android'
-        },
+        headers: deviceHeaders,
+        body: { deviceId: device.id },
         stringify,
         sanitizeRequestLog: { headers: { Cookie: true } },
         sanitizeResponseLog: { headers: { 'set-cookie': true } }
       })
-      console.log('[LOGIN] setDeviceId response:', JSON.stringify(setDeviceIdRes.body))
-    } catch (e) {
-      console.log('[LOGIN] setDeviceId error (non-fatal):', e.message)
-    }
+      console.log('[LOGIN] setDevice trigger response:', JSON.stringify(triggerRes.body))
 
-    try {
-      console.log('[LOGIN] Step 2: Waiting for device binding SMS code...')
-      const bindingCode = await ZenMoney.readLine('Введите код привязки устройства из СМС (код для привязки мобильного приложения)', {
-        time: 120000,
-        inputType: 'number'
-      })
-      if (!bindingCode || !bindingCode.trim()) {
-        console.log('[LOGIN] No binding code entered, device not registered')
-      } else {
-        console.log('[LOGIN] Step 3: setDevice with binding code...')
-        const setDeviceRes = await fetchJson(mobileApiUrl + '/setDevice', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Android',
-            Cookie: sessionCookies,
-            'zp-cookie': sessionCookies
-          },
-          body: {
-            deviceId: device.id,
-            code: bindingCode.trim()
-          },
-          stringify,
-          sanitizeRequestLog: { headers: { Cookie: true } },
-          sanitizeResponseLog: { headers: { 'set-cookie': true } }
+      if (triggerRes.body && triggerRes.body.code === 'smsActivation') {
+        console.log('[LOGIN] Step 2: SMS activation required, waiting for code...')
+        const bindingCode = await ZenMoney.readLine('Введите код привязки устройства из СМС (код для привязки мобильного приложения)', {
+          time: 120000,
+          inputType: 'number'
         })
-        console.log('[LOGIN] setDevice response:', JSON.stringify(setDeviceRes.body))
-        if (setDeviceRes.body && setDeviceRes.body.status === 'OK') {
-          console.log('Device registered successfully')
+        if (bindingCode && bindingCode.trim()) {
+          console.log('[LOGIN] Step 3: setDevice with binding code...')
+          const setDeviceRes = await fetchJson(mobileApiUrl + '/setDevice', {
+            method: 'POST',
+            headers: deviceHeaders,
+            body: {
+              deviceId: device.id,
+              code: bindingCode.trim()
+            },
+            stringify,
+            sanitizeRequestLog: { headers: { Cookie: true } },
+            sanitizeResponseLog: { headers: { 'set-cookie': true } }
+          })
+          console.log('[LOGIN] setDevice final response:', JSON.stringify(setDeviceRes.body))
+          if (setDeviceRes.body && setDeviceRes.body.status === 'OK') {
+            console.log('Device registered successfully')
+          } else {
+            console.log('[LOGIN] Device binding response not OK:', setDeviceRes.body?.message || 'unknown error')
+          }
         } else {
-          console.log('[LOGIN] Device binding response not OK:', setDeviceRes.body?.message || 'unknown error')
+          console.log('[LOGIN] No binding code entered, skipping device registration')
         }
+      } else if (triggerRes.body && triggerRes.body.status === 'OK') {
+        console.log('Device registered successfully (no SMS needed)')
+      } else {
+        console.log('[LOGIN] Unexpected setDevice response:', triggerRes.body?.message || 'unknown')
       }
     } catch (e) {
       console.log('[LOGIN] Device binding failed (non-fatal):', e.message)

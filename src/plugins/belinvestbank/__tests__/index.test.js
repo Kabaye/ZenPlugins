@@ -182,39 +182,45 @@ function mockApiAuthCallback () {
 }
 
 function mockApiSaveDevice () {
+  let setDeviceCallCount = 0
+
+  // First call: setDevice without code (triggers SMS)
   fetchMock.once({
     method: 'POST',
     headers: { Cookie: 'PHPSESSID=ibanksession;' },
-    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDeviceId' && _.isEqual(body, stringify({
-      deviceId: 'device id',
-      os: 'Android'
-    })),
-    response: {
-      status: 200,
-      body: {
-        status: 'OK',
-        values: {
-          info: 'SMS sent for device binding',
-          _appName: 'simple'
+    matcher: (url, { body }) => setDeviceCallCount === 0 &&
+      url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDevice' &&
+      _.isEqual(body, stringify({ deviceId: 'device id' })),
+    response: () => {
+      setDeviceCallCount++
+      return {
+        status: 200,
+        body: {
+          status: 'ER',
+          message: 'Необходимо подтверждение смс-кодом',
+          code: 'smsActivation'
         }
       }
     }
   })
 
+  // Second call: setDevice with binding code
   fetchMock.once({
     method: 'POST',
     headers: { Cookie: 'PHPSESSID=ibanksession;' },
-    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDevice' && _.isEqual(body, stringify({
-      deviceId: 'device id',
-      code: '5678'
-    })),
-    response: {
-      status: 200,
-      body: {
-        status: 'OK',
-        values: {
-          info: 'Device registered',
-          _appName: 'simple'
+    matcher: (url, { body }) => setDeviceCallCount === 1 &&
+      url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDevice' &&
+      _.isEqual(body, stringify({ deviceId: 'device id', code: '5678' })),
+    response: () => {
+      setDeviceCallCount++
+      return {
+        status: 200,
+        body: {
+          status: 'OK',
+          values: {
+            info: 'Device registered',
+            _appName: 'simple'
+          }
         }
       }
     }
