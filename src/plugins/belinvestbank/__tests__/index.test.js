@@ -6,6 +6,9 @@ import { makePluginDataApi } from '../../../ZPAPI.pluginData'
 
 describe('scrape', () => {
   it('should hit the mocks and return results', async () => {
+    // Override setTimeout to resolve immediately (avoids 7s SMS delay in tests)
+    const origSetTimeout = global.setTimeout
+    global.setTimeout = (fn, ms) => origSetTimeout(fn, 0)
     mockZenMoney()
     mockApiLoginAndPass()
     mockApiCloseLastSession()
@@ -22,6 +25,7 @@ describe('scrape', () => {
         toDate: new Date(2026, 0, 2)
       }
     )
+    global.setTimeout = origSetTimeout
 
     expect(result.accounts).toEqual([
       {

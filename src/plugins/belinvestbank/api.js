@@ -11,6 +11,7 @@ const loginUrl = 'https://login.belinvestbank.by/app_api'
 const dataUrl = 'https://ibank.belinvestbank.by/app_api'
 
 const APP_VERSION = '2.25.0'
+const SMS_ARRIVAL_DELAY_MS = 7000
 
 function generateUUID () {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -156,21 +157,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
         return savedCookies
       }
     } catch (e) {
-      // Session expired — close it preemptively to avoid session conflict on signin
-      console.log('[LOGIN] Saved session invalid, closing it preemptively...')
-      try {
-        await fetchApiJson(loginUrl, {
-          method: 'POST',
-          headers: { Cookie: savedCookies },
-          body: {
-            section: 'account',
-            method: 'confirmationCloseSession'
-          }
-        }, response => response.ok, () => new Error('close failed'))
-        console.log('[LOGIN] Old session closed preemptively')
-      } catch (closeErr) {
-        console.log('[LOGIN] Preemptive close failed (non-fatal):', closeErr.message)
-      }
+      console.log('[LOGIN] Saved session invalid, need fresh login')
       ZenMoney.setData('sessionCookies', null)
     }
   }
@@ -203,8 +190,9 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   console.log('[LOGIN] signin response:', JSON.stringify(res.body))
   console.log('[LOGIN] isNeedConfirmSessionKey:', res.body.isNeedConfirmSessionKey)
 
-  // Handle session conflict (should be rare after preemptive close)
+  let hadSessionConflict = false
   if (res.body.isNeedConfirmSessionKey) {
+    hadSessionConflict = true
     console.log('[LOGIN] Session conflict detected, closing and retrying...')
     await fetchApiJson(loginUrl, {
       method: 'POST',
@@ -242,7 +230,16 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   console.log('[LOGIN] authCode:', res.body.values?.authCode)
   if (res.body.values && !res.body.values.authCode) {
     console.log('[LOGIN] No authCode, SMS needed. Waiting for user input...')
-    const code = await ZenMoney.readLine('Введите код из СМС для входа в Белинвестбанк', {
+    if (hadSessionConflict) {
+      // When there was a session conflict, two signin calls happened — each triggers an SMS.
+      // Wait a few seconds so all SMS arrive, then ask user for the LAST code.
+      console.log('[LOGIN] Had session conflict — waiting for all SMS to arrive...')
+      await new Promise(resolve => setTimeout(resolve, SMS_ARRIVAL_DELAY_MS))
+    }
+    const smsPrompt = hadSessionConflict
+      ? 'Вы получили несколько СМС. Введите код из ПОСЛЕДНЕГО полученного СМС для входа'
+      : 'Введите код из СМС для входа в Белинвестбанк'
+    const code = await ZenMoney.readLine(smsPrompt, {
       time: 120000,
       inputType: 'number'
     })
@@ -262,7 +259,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
         device_token: device.token,
         device_token_type: 'ANDROID'
       }
-    }, response => response.ok && response.body.status && response.body.status === 'OK', message => new InvalidPreferencesError('bad request')))
+    }, response => response.ok && response.body.status && response.body.status === 'OK', message => new InvalidOtpCodeError('Ответ банка: ' + message)))
     console.log('[LOGIN] signin2 response:', JSON.stringify(res.body))
 
     isNeededSaveDevice = true
