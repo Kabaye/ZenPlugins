@@ -190,36 +190,16 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
 
   if (res.body.isNeedConfirmSessionKey) {
     console.log('[LOGIN] Confirming close session...')
-    await fetchApiJson(loginUrl, {
+    res = (await fetchApiJson(loginUrl, {
       method: 'POST',
       headers: { Cookie: sessionCookies },
       body: {
         section: 'account',
         method: 'confirmationCloseSession'
       }
-    }, response => response.ok, message => new InvalidPreferencesError('bad request'))
-    console.log('[LOGIN] Session closed, re-signing in...')
-
-    res = (await fetchApiJson(loginUrl, {
-      method: 'POST',
-      body: {
-        section: 'account',
-        method: 'signin',
-        login,
-        password,
-        deviceId: device.id,
-        versionApp: APP_VERSION,
-        deviceName: 'Samsung SM-S926B',
-        os: 'Android',
-        AndroidVersion: '34',
-        device_token: device.token,
-        device_token_type: 'ANDROID',
-        typeSessionKey: '0'
-      },
-      sanitizeRequestLog: { body: { login: true, password: true } }
-    }, response => response.ok, message => new InvalidPreferencesError('Неверный логин или пароль')))
+    }, response => response.ok, message => new InvalidPreferencesError('bad request')))
     sessionCookies = cookies(res)
-    console.log('[LOGIN] Re-signin response:', JSON.stringify(res.body))
+    console.log('[LOGIN] Session closed, response:', JSON.stringify(res.body))
   }
 
   let isNeededSaveDevice = false
@@ -316,7 +296,11 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
           sanitizeResponseLog: { headers: { 'set-cookie': true } }
         })
         console.log('[LOGIN] setDevice response:', JSON.stringify(setDeviceRes.body))
-        console.log('Device registered successfully')
+        if (setDeviceRes.body && setDeviceRes.body.status === 'OK') {
+          console.log('Device registered successfully')
+        } else {
+          console.log('[LOGIN] Device binding response not OK:', setDeviceRes.body?.message || 'unknown error')
+        }
       }
     } catch (e) {
       console.log('[LOGIN] Device binding failed (non-fatal):', e.message)
