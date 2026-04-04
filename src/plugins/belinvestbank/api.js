@@ -248,19 +248,32 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   sessionCookies = cookies(res)
 
   if (isNeededSaveDevice) {
+    console.log('[LOGIN] Step 1: setDeviceId (triggering binding SMS)...')
     try {
-      console.log('[LOGIN] Step 1: setDeviceId...')
-      await fetchApiJson(dataUrl, {
+      const setDeviceIdRes = await fetchJson(dataUrl, {
         method: 'POST',
-        headers: { Cookie: sessionCookies },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Android',
+          Cookie: sessionCookies,
+          'zp-cookie': sessionCookies
+        },
         body: {
           section: 'mobile',
           method: 'setDeviceId',
           deviceId: device.id,
           os: 'Android'
-        }
-      }, response => response.ok, () => {})
+        },
+        stringify,
+        sanitizeRequestLog: { headers: { Cookie: true } },
+        sanitizeResponseLog: { headers: { 'set-cookie': true } }
+      })
+      console.log('[LOGIN] setDeviceId response:', JSON.stringify(setDeviceIdRes.body))
+    } catch (e) {
+      console.log('[LOGIN] setDeviceId error (non-fatal):', e.message)
+    }
 
+    try {
       console.log('[LOGIN] Step 2: Waiting for device binding SMS code...')
       const bindingCode = await ZenMoney.readLine('Введите код привязки устройства из СМС (код для привязки мобильного приложения)', {
         time: 120000,
@@ -270,21 +283,29 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
         console.log('[LOGIN] No binding code entered, device not registered')
       } else {
         console.log('[LOGIN] Step 3: setDevice with binding code...')
-        const setDeviceRes = await fetchApiJson(dataUrl, {
+        const setDeviceRes = await fetchJson(dataUrl, {
           method: 'POST',
-          headers: { Cookie: sessionCookies },
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Android',
+            Cookie: sessionCookies,
+            'zp-cookie': sessionCookies
+          },
           body: {
             section: 'mobile',
             method: 'setDevice',
             deviceId: device.id,
             code: bindingCode.trim()
-          }
-        }, response => response.ok, () => {})
+          },
+          stringify,
+          sanitizeRequestLog: { headers: { Cookie: true } },
+          sanitizeResponseLog: { headers: { 'set-cookie': true } }
+        })
         console.log('[LOGIN] setDevice response:', JSON.stringify(setDeviceRes.body))
         console.log('Device registered successfully')
       }
     } catch (e) {
-      console.log('Device binding failed (non-fatal), SMS will be needed next time:', e.message)
+      console.log('[LOGIN] Device binding failed (non-fatal):', e.message)
     }
   }
 
