@@ -340,4 +340,3 @@ function mockZenMoney () {
   }
   ZenMoney.readLine = async () => '1234'
 }
-
