@@ -158,9 +158,7 @@ function mockApiSaveDevice () {
   fetchMock.once({
     method: 'POST',
     headers: { Cookie: 'PHPSESSID=ibanksession;' },
-    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && _.isEqual(body, stringify({
-      section: 'mobile',
-      method: 'setDeviceId',
+    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDeviceId' && _.isEqual(body, stringify({
       deviceId: 'device id',
       os: 'Android'
     })),
@@ -179,9 +177,7 @@ function mockApiSaveDevice () {
   fetchMock.once({
     method: 'POST',
     headers: { Cookie: 'PHPSESSID=ibanksession;' },
-    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/app_api' && _.isEqual(body, stringify({
-      section: 'mobile',
-      method: 'setDevice',
+    matcher: (url, { body }) => url === 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile/setDevice' && _.isEqual(body, stringify({
       deviceId: 'device id',
       code: '5678'
     })),

@@ -248,9 +248,11 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   sessionCookies = cookies(res)
 
   if (isNeededSaveDevice) {
+    const mobileApiUrl = 'https://ibank.belinvestbank.by/simple/mobile-api/v1/mobile'
+
     console.log('[LOGIN] Step 1: setDeviceId (triggering binding SMS)...')
     try {
-      const setDeviceIdRes = await fetchJson(dataUrl, {
+      const setDeviceIdRes = await fetchJson(mobileApiUrl + '/setDeviceId', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -259,8 +261,6 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
           'zp-cookie': sessionCookies
         },
         body: {
-          section: 'mobile',
-          method: 'setDeviceId',
           deviceId: device.id,
           os: 'Android'
         },
@@ -283,7 +283,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
         console.log('[LOGIN] No binding code entered, device not registered')
       } else {
         console.log('[LOGIN] Step 3: setDevice with binding code...')
-        const setDeviceRes = await fetchJson(dataUrl, {
+        const setDeviceRes = await fetchJson(mobileApiUrl + '/setDevice', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -292,8 +292,6 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
             'zp-cookie': sessionCookies
           },
           body: {
-            section: 'mobile',
-            method: 'setDevice',
             deviceId: device.id,
             code: bindingCode.trim()
           },
