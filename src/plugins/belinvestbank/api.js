@@ -32,6 +32,7 @@ export function getDevice () {
 }
 
 async function fetchApiJson (url, options, predicate = () => true, error = (message) => console.assert(false, message)) {
+  const deviceId = ZenMoney.getData('deviceId', null)
   options = defaultsDeep(
     options,
     {
@@ -40,7 +41,8 @@ async function fetchApiJson (url, options, predicate = () => true, error = (mess
         'User-Agent': 'Android',
         DEVICE_TOKEN: 123456,
         Connection: 'Keep-Alive',
-        'Accept-Encoding': 'gzip'
+        'Accept-Encoding': 'gzip',
+        ...(deviceId ? { deviceId } : {})
       },
       sanitizeRequestLog: { headers: { Cookie: true } },
       sanitizeResponseLog: { headers: { 'set-cookie': true } },
@@ -146,6 +148,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
   // Reuse saved session
   const savedCookies = ZenMoney.getData('sessionCookies', null)
   if (savedCookies) {
+    console.log('[LOGIN] Attempting session reuse with saved cookies...')
     try {
       const testRes = await fetchApiJson(dataUrl, {
         method: 'POST',
@@ -189,6 +192,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
 
   console.log('[LOGIN] signin response:', JSON.stringify(res.body))
   console.log('[LOGIN] isNeedConfirmSessionKey:', res.body.isNeedConfirmSessionKey)
+  console.log('[LOGIN] isAppUser:', res.body.values?.isAppUser)
 
   let hadSessionConflict = false
   if (res.body.isNeedConfirmSessionKey) {
@@ -223,6 +227,7 @@ RcKU18IVYcmzCkZymo7An3zD68Pq38TGn1QcYieV8vdE18uLGUkRnFN1bqodNFu5
     }, response => response.ok, message => new InvalidPreferencesError('Неверный логин или пароль')))
     sessionCookies = cookies(res)
     console.log('[LOGIN] Re-signin response:', JSON.stringify(res.body))
+    console.log('[LOGIN] Re-signin isAppUser:', res.body.values?.isAppUser)
   }
 
   let isNeededSaveDevice = false
