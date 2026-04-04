@@ -65,7 +65,7 @@ function mockApiLoginAndPass () {
       password: 'pass',
       deviceId: 'device id',
       versionApp: '2.25.0',
-      deviceName: 'Samsung SM-G991B',
+      deviceName: 'Samsung SM-S926B',
       os: 'Android',
       AndroidVersion: '34',
       device_token: 'device token',
