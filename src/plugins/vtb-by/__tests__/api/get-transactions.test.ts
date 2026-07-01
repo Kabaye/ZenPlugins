@@ -2,6 +2,14 @@ import { AccountType } from '../../../../types/zenmoney'
 
 const mockFetchDepositAccountStatement = jest.fn()
 const mockFetchMiniCardStatement = jest.fn()
+const DAY_MS = 24 * 60 * 60 * 1000
+
+const getRecentNoonTimestamp = (daysAgo: number): number => {
+  const date = new Date()
+  date.setUTCDate(date.getUTCDate() - daysAgo)
+  date.setUTCHours(12, 0, 0, 0)
+  return date.getTime()
+}
 
 jest.mock('../../fetchApi', () => ({
   ...jest.requireActual('../../fetchApi'),
@@ -55,6 +63,8 @@ describe('getTransactions', () => {
   })
 
   it('prefers posted mini card operation over matching hold duplicate', async () => {
+    const operationDate = getRecentNoonTimestamp(1)
+
     mockFetchMiniCardStatement.mockResolvedValue({
       errorInfo: {
         error: '0',
@@ -63,7 +73,7 @@ describe('getTransactions', () => {
       },
       statement: [
         {
-          operationDate: new Date('2026-05-10T12:00:00.000Z').getTime(),
+          operationDate,
           operationDescription: 'Авторизация',
           operationAmount: 10,
           operationCurrency: '933',
@@ -74,7 +84,7 @@ describe('getTransactions', () => {
           transactionAuthCode: '999'
         },
         {
-          operationDate: new Date('2026-05-10T12:00:00.000Z').getTime(),
+          operationDate,
           operationDescription: 'Покупка',
           operationAmount: 10,
           operationCurrency: '933',
@@ -89,8 +99,8 @@ describe('getTransactions', () => {
 
     await expect(getTransactions({
       sessionToken: 'session-token',
-      fromDate: new Date('2026-05-01T00:00:00.000Z'),
-      toDate: new Date('2026-05-31T23:59:59.000Z')
+      fromDate: new Date(operationDate - DAY_MS),
+      toDate: new Date(operationDate + DAY_MS)
     }, {
       id: 'card-account',
       type: AccountType.ccard,
@@ -109,7 +119,7 @@ describe('getTransactions', () => {
         comment: 'Покупка\nSTORE',
         movements: [
           {
-            id: 'card-account:auth:1778414400000:999',
+            id: `card-account:auth:${operationDate}:999`,
             sum: 10
           }
         ]
@@ -118,6 +128,9 @@ describe('getTransactions', () => {
   })
 
   it('keeps repeated mini card auth codes distinct across operation dates', async () => {
+    const firstOperationDate = getRecentNoonTimestamp(2)
+    const secondOperationDate = firstOperationDate + DAY_MS
+
     mockFetchMiniCardStatement.mockResolvedValue({
       errorInfo: {
         error: '0',
@@ -126,7 +139,7 @@ describe('getTransactions', () => {
       },
       statement: [
         {
-          operationDate: new Date('2026-05-10T12:00:00.000Z').getTime(),
+          operationDate: firstOperationDate,
           operationDescription: 'Покупка',
           operationAmount: 10,
           operationCurrency: '933',
@@ -137,7 +150,7 @@ describe('getTransactions', () => {
           transactionAuthCode: '999'
         },
         {
-          operationDate: new Date('2026-05-11T12:00:00.000Z').getTime(),
+          operationDate: secondOperationDate,
           operationDescription: 'Покупка',
           operationAmount: 10,
           operationCurrency: '933',
@@ -152,8 +165,8 @@ describe('getTransactions', () => {
 
     await expect(getTransactions({
       sessionToken: 'session-token',
-      fromDate: new Date('2026-05-01T00:00:00.000Z'),
-      toDate: new Date('2026-05-31T23:59:59.000Z')
+      fromDate: new Date(firstOperationDate - DAY_MS),
+      toDate: new Date(secondOperationDate + DAY_MS)
     }, {
       id: 'card-account',
       type: AccountType.ccard,
