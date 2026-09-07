@@ -13,8 +13,16 @@ const response = (status: number, body: unknown): unknown => ({
 
 describe('Q-Pay API', () => {
   // Require after jest.mock: esbuild does not hoist the mock ahead of static imports.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { fetchCards, fetchCurrentUser, login, SessionExpiredError } = require('../fetchApi') as typeof import('../fetchApi')
+  /* eslint-disable @typescript-eslint/no-var-requires */
+  const {
+    fetchCards,
+    fetchCardTransactions,
+    fetchCurrentUser,
+    fetchWalletTransactions,
+    login,
+    SessionExpiredError
+  } = require('../fetchApi') as typeof import('../fetchApi')
+  /* eslint-enable @typescript-eslint/no-var-requires */
 
   beforeEach(() => {
     mockFetchJson.mockReset()
@@ -66,5 +74,57 @@ describe('Q-Pay API', () => {
       headers: { Authorization: true },
       body: true
     })
+  })
+
+  it('paginates wallet history and keeps only the requested date interval', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      id: `wallet-${index}`,
+      created_at: index === 0 ? 1735689599 : 1767225600
+    }))
+    mockFetchJson
+      .mockResolvedValueOnce(response(200, { total: 101, items: firstPage }))
+      .mockResolvedValueOnce(response(200, {
+        total: 101,
+        items: [{ id: 'wallet-100', created_at: 1798761600 }]
+      }))
+
+    const session = { email: 'user@example.com', accessToken: 'token' }
+    const transactions = await fetchWalletTransactions(
+      session,
+      new Date('2026-01-01T00:00:00Z'),
+      new Date('2026-12-31T23:59:59Z')
+    )
+
+    expect(transactions).toHaveLength(99)
+    expect(mockFetchJson.mock.calls.map(call => call[0])).toEqual([
+      'https://pay.quantera.pro/api/v1/miniapp/transactions?limit=100&offset=0',
+      'https://pay.quantera.pro/api/v1/miniapp/transactions?limit=100&offset=100'
+    ])
+  })
+
+  it('uses the observed card transaction endpoint and encodes the card id', async () => {
+    mockFetchJson.mockResolvedValue(response(200, {
+      total: 1,
+      items: [{ id: 'card-transaction', created_at: 1767225600 }]
+    }))
+
+    await expect(fetchCardTransactions(
+      { email: 'user@example.com', accessToken: 'token' },
+      'card/id',
+      new Date('2026-01-01T00:00:00Z'),
+      new Date('2026-12-31T23:59:59Z')
+    )).resolves.toHaveLength(1)
+    expect(mockFetchJson.mock.calls[0][0]).toBe(
+      'https://pay.quantera.pro/api/v1/miniapp/cards/card%2Fid/transactions?limit=100&offset=0'
+    )
+  })
+
+  it('rejects a malformed transaction page instead of silently returning no history', async () => {
+    mockFetchJson.mockResolvedValue(response(200, { total: 1, results: [] }))
+    await expect(fetchWalletTransactions(
+      { email: 'user@example.com', accessToken: 'token' },
+      new Date('2026-01-01T00:00:00Z'),
+      new Date('2026-12-31T23:59:59Z')
+    )).rejects.toBeInstanceOf(TemporaryError)
   })
 })

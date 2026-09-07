@@ -2,7 +2,7 @@
 <provider>
     <id>q-pay</id>
     <company>0</company>
-    <description>Q-Pay (pay.quantera.pro) — синхронизация балансов открытых кошельков и активных карт без истории операций.</description>
+    <description>Q-Pay (pay.quantera.pro) — синхронизация кошельков, активных карт и истории операций.</description>
     <version>1.0</version>
     <build>1</build>
     <modular>true</modular>

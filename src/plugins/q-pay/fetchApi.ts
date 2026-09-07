@@ -6,7 +6,9 @@ import {
   Preferences,
   QPayCard,
   QPayCardBalance,
+  QPayCardTransaction,
   QPayUser,
+  QPayWalletTransaction,
   QPAY_BASE_URL,
   QPAY_ENDPOINTS,
   Session
@@ -21,6 +23,7 @@ const COMMON_HEADERS = {
 
 const EMAIL_REGEXP = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_REGEXP = /^[\w!@#$%^&*()\-_+.]{8,}$/
+const PAGE_SIZE = 100
 
 const LOG_REDACTION: Pick<FetchOptions, 'sanitizeRequestLog' | 'sanitizeResponseLog'> = {
   // Login uses a serialized multipart body, so redact it as one opaque value. The same
@@ -141,4 +144,82 @@ export async function fetchCardBalance (session: Session, cardId: string): Promi
     throw new TemporaryError('Q-Pay вернул неожиданный баланс карты')
   }
   return response.body as QPayCardBalance
+}
+
+function transactionDate (value: string | number | null | undefined): Date | null {
+  if (typeof value === 'number') {
+    const date = new Date(value * 1000)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  if (typeof value === 'string' && value !== '') {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  return null
+}
+
+async function fetchTransactionPages<T extends { created_at?: string | number | null }> (
+  session: Session,
+  path: string,
+  fromDate: Date,
+  toDate: Date
+): Promise<T[]> {
+  const result: T[] = []
+  let offset = 0
+
+  while (true) {
+    const separator = path.includes('?') ? '&' : '?'
+    const response = await request(`${path}${separator}limit=${PAGE_SIZE}&offset=${offset}`, session)
+    const body = response.body as { items?: unknown, total?: unknown } | null | undefined
+    const responseItems = body?.items
+    if (!Array.isArray(responseItems)) {
+      throw new TemporaryError('Q-Pay вернул неожиданную историю операций')
+    }
+
+    const items = responseItems as T[]
+    result.push(...items.filter(item => {
+      const date = transactionDate(item.created_at)
+      return date != null && date >= fromDate && date <= toDate
+    }))
+
+    offset += items.length
+    const responseTotal = body?.total
+    const total = typeof responseTotal === 'number' && Number.isFinite(responseTotal)
+      ? responseTotal
+      : null
+    if (items.length === 0 || (total != null ? offset >= total : items.length < PAGE_SIZE)) {
+      break
+    }
+  }
+
+  return result
+}
+
+/** Fetch wallet operations in the requested ZenMoney date interval. */
+export async function fetchWalletTransactions (
+  session: Session,
+  fromDate: Date,
+  toDate: Date
+): Promise<QPayWalletTransaction[]> {
+  return await fetchTransactionPages<QPayWalletTransaction>(
+    session,
+    QPAY_ENDPOINTS.transactions,
+    fromDate,
+    toDate
+  )
+}
+
+/** Fetch operations for one active Q-Pay card in the requested date interval. */
+export async function fetchCardTransactions (
+  session: Session,
+  cardId: string,
+  fromDate: Date,
+  toDate: Date
+): Promise<QPayCardTransaction[]> {
+  return await fetchTransactionPages<QPayCardTransaction>(
+    session,
+    `${QPAY_ENDPOINTS.cards}/${encodeURIComponent(cardId)}/transactions`,
+    fromDate,
+    toDate
+  )
 }

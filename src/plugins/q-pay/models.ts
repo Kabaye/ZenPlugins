@@ -2,6 +2,8 @@
 export interface Preferences {
   email: string
   password: string
+  // Required by the shared ZenPlugins date adapter and exposed in preferences.xml.
+  startDate?: string
 }
 
 /** Bearer session persisted between synchronizations. */
@@ -58,10 +60,55 @@ export interface QPayCardWithBalance {
   balance: QPayCardBalance
 }
 
+export interface QPayWalletTransaction {
+  id?: string | null
+  amount?: string | number | null
+  full_amount?: string | number | null
+  system_fee?: string | number | null
+  asset?: string | null
+  network?: string | null
+  status?: string | null
+  type?: string | null
+  created_at?: string | number | null
+  completed_at?: string | number | null
+  in_wallet_address?: string | null
+  out_wallet_address?: string | null
+  transaction_hash?: string | null
+}
+
+export interface QPayCardMerchant {
+  name?: string | null
+  mcc?: string | number | null
+  city?: string | null
+  country?: string | null
+}
+
+export interface QPayCardTransaction {
+  id?: string | null
+  x_id?: string | null
+  amount?: string | number | null
+  fee?: string | number | null
+  currency?: string | null
+  original_amount?: string | number | null
+  original_currency?: string | null
+  status?: string | null
+  type?: string | null
+  lifecycle_stage?: string | null
+  created_at?: string | number | null
+  description?: string | null
+  merchant?: QPayCardMerchant | null
+}
+
+export interface QPayCardTransactions {
+  cardId: string
+  transactions: QPayCardTransaction[]
+}
+
 export const QPAY_BASE_URL = 'https://pay.quantera.pro/api'
 
 export const QPAY_ENDPOINTS = {
   login: '/v1/web/auth/login',
   currentUser: '/v1/web/users/self',
-  cards: '/v1/miniapp/cards'
+  cards: '/v1/miniapp/cards',
+  transactions: '/v1/miniapp/transactions'
 }
