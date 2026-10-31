@@ -11,8 +11,9 @@ const { fetchFullTransactions }: {
 const url = 'https://mobapp-frontend.bgpb.by/sou2/xml_online.admin'
 const sid = 'statement-secret-sid'
 const account = { title: 'Deposit', transactionsAccId: 'statement-action' }
-const fromDate = new Date('2026-05-01T00:00:00+0300')
-const toDate = new Date('2026-05-21T00:00:00+0300')
+// SOU formats date-only bounds with local calendar getters; keep model inputs calendar-based too.
+const fromDate = new Date(2026, 4, 1)
+const toDate = new Date(2026, 4, 21)
 const authorization = { deviceNo: '123456', otp: '654321' }
 const nextAuthorization = { deviceNo: '123456', otp: '654322' }
 
